@@ -18,7 +18,7 @@
 
 export default {
   // Cómo le dices. Sale en la portada ("Para …") y en el cartel del jardín.
-  para: "mi princesita",
+  para: "Laura",
 
   // Tu firma (sale al final de la carta).
   de: "Héctor",

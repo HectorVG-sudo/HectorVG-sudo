@@ -786,6 +786,145 @@ const chispas = (() => {
   };
 })();
 
+/* ═════════════════════ Chiikawa, Hachiware y Usagi ═════════════════════
+   Van en fila dando saltitos por el borde del jardín. Si los tocas,
+   pegan un salto grande. */
+
+const personajes = [];
+const toquesPersonajes = [];
+const PASEO = RADIO - 0.95; // anillo libre entre las flores y los arbustos
+{
+  const mat = (color, brillo = 0.25) => conBrillo(color, brillo, { roughness: 0.75 });
+  const NEGRO = new THREE.MeshStandardMaterial({ color: '#1b1420', roughness: 0.35 });
+  const BRILLO_OJO = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+  const ROSA = mat('#ff9dbd', 0.35);
+  const BOCA = new THREE.MeshStandardMaterial({ color: '#5a1d2c', roughness: 0.6 });
+  const esfera = (r, a = 20, b = 14) => new THREE.SphereGeometry(r, a, b);
+  const G = {
+    cuerpo: esfera(0.13), cabeza: esfera(0.19, 28, 20), pie: esfera(0.05, 12, 8), brazo: esfera(0.045, 12, 8),
+    ojo: esfera(0.024, 12, 10), brillo: esfera(0.008, 8, 6), mejilla: esfera(0.032, 14, 8), boca: esfera(0.014, 10, 6),
+    orejaRedonda: esfera(0.058, 14, 10), cola: esfera(0.04, 10, 8),
+    orejaGato: new THREE.ConeGeometry(0.066, 0.12, 18),
+    orejaConejo: new THREE.CapsuleGeometry(0.042, 0.2, 6, 14),
+    // Gorro azul de Hachiware: casquete con la «V» blanca en la frente
+    gorro: new THREE.SphereGeometry(0.192, 32, 14, Math.PI / 2 + 0.38, Math.PI * 2 - 0.76, 0, 1.2),
+  };
+
+  const DATOS = [
+    { tipo: 'usagi', piel: '#f8e7a2', periodo: 0.42, altura: 0.27 },     // la más alocada, va delante
+    { tipo: 'chiikawa', piel: '#fffaf3', periodo: 0.56, altura: 0.16 },
+    { tipo: 'hachiware', piel: '#fffaf3', periodo: 0.6, altura: 0.19 },
+  ];
+
+  DATOS.forEach((d, k) => {
+    const mPiel = mat(d.piel);
+    const raiz = new THREE.Group(); // posición en el paseo
+    const cuerpo = new THREE.Group(); // salto y aplastamiento
+    raiz.add(cuerpo);
+    const pieza = (geo, m, x, y, z, sx = 1, sy = 1, sz = 1) => {
+      const o = new THREE.Mesh(geo, m);
+      o.position.set(x, y, z);
+      o.scale.set(sx, sy, sz);
+      cuerpo.add(o);
+      return o;
+    };
+
+    pieza(G.cuerpo, mPiel, 0, 0.15, 0, 1, 1.05, 0.95);
+    pieza(G.cabeza, mPiel, 0, 0.37, 0, 1.12, 0.94, 1);
+    pieza(G.pie, mPiel, -0.065, 0.035, 0.02, 1, 0.65, 1.3);
+    pieza(G.pie, mPiel, 0.065, 0.035, 0.02, 1, 0.65, 1.3);
+    const brazos = [-1, 1].map((s) => {
+      const b = pieza(G.brazo, mPiel, s * 0.13, 0.19, 0.02, 1, 1.5, 1);
+      b.rotation.z = s * 0.6;
+      return b;
+    });
+    for (const s of [-1, 1]) {
+      const ojo = pieza(G.ojo, NEGRO, s * 0.075, 0.385, 0.168, 1, 1.25, 0.6);
+      ojo.rotation.y = s * 0.35;
+      pieza(G.brillo, BRILLO_OJO, s * 0.075 + 0.009, 0.399, 0.181);
+      const mejilla = pieza(G.mejilla, ROSA, s * 0.125, 0.335, 0.143, 1.35, 0.62, 0.35);
+      mejilla.rotation.y = s * 0.65;
+    }
+    if (d.tipo === 'usagi') pieza(G.boca, BOCA, 0, 0.33, 0.178, 1.5, 1.3, 0.5); // siempre con la boca abierta
+    else pieza(G.boca, BOCA, 0, 0.337, 0.182, 0.9, 0.5, 0.4);
+
+    if (d.tipo === 'chiikawa') {
+      for (const s of [-1, 1]) pieza(G.orejaRedonda, mPiel, s * 0.12, 0.52, -0.01, 1, 0.9, 0.7);
+      pieza(G.cola, mPiel, 0, 0.11, -0.13);
+    } else if (d.tipo === 'hachiware') {
+      const azul = mat('#5f74a8', 0.2);
+      const gorro = pieza(G.gorro, azul, 0, 0.37, 0, 1.12, 0.94, 1);
+      gorro.material = azul;
+      for (const s of [-1, 1]) {
+        const oreja = pieza(G.orejaGato, azul, s * 0.12, 0.535, -0.005);
+        oreja.rotation.z = -s * 0.38;
+      }
+      pieza(G.cola, azul, 0, 0.11, -0.13, 1, 1, 1.2);
+    } else {
+      for (const s of [-1, 1]) {
+        const oreja = pieza(G.orejaConejo, mPiel, s * 0.075, 0.63, -0.02, 1, 1, 0.8);
+        oreja.rotation.z = -s * 0.14;
+      }
+      pieza(G.cola, mPiel, 0, 0.11, -0.13);
+    }
+
+    const sombra = new THREE.Mesh(GEO.sombra, MAT.sombra);
+    sombra.position.y = 0.014;
+    raiz.add(sombra);
+
+    const toque = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6), MAT.invisible);
+    toque.position.y = 0.32;
+    toque.userData.personaje = k;
+    cuerpo.add(toque);
+    toquesPersonajes.push(toque);
+
+    escena.add(raiz);
+    personajes.push({
+      ...d, raiz, cuerpo, brazos, sombra,
+      ang0: Math.PI / 2 - 0.35 - k * (0.6 / PASEO), // salen por delante, en fila
+      desfase: k * 0.17,
+      salto: -10,
+    });
+  });
+}
+
+function moverPersonajes(t) {
+  const giro = 0.1; // rad/s: una vuelta al jardín cada minuto
+  for (const p of personajes) {
+    const a = p.ang0 + giro * t;
+    p.raiz.position.set(Math.cos(a) * PASEO, 0, Math.sin(a) * PASEO);
+    p.raiz.rotation.y = -a + 1.05; // avanzan de lado, mirando hacia fuera (hacia quien mira el jardín)
+
+    const fase = ((t + p.desfase) / p.periodo) % 1;
+    const arco = Math.sin(fase * Math.PI);
+    let h = arco * p.altura;
+    const suelo = 1 - Math.min(1, arco * 3); // 1 al tocar el suelo
+    // salto grande al tocarlos (con vuelta en el aire)
+    const s = (t - p.salto) / 1.1;
+    if (s >= 0 && s < 1) {
+      h += Math.sin(s * Math.PI) * 0.65;
+      p.cuerpo.rotation.y = suave(s) * Math.PI * 2;
+    } else p.cuerpo.rotation.y = 0;
+
+    p.cuerpo.position.y = h;
+    const sy = 1 - 0.16 * suelo + 0.06 * (1 - suelo);
+    const sxz = 1 + 0.1 * suelo - 0.03 * (1 - suelo);
+    p.cuerpo.scale.set(sxz, sy, sxz);
+    const ola = 0.6 + Math.sin(fase * Math.PI * 2) * 0.35 + (s >= 0 && s < 1 ? 1.2 : 0);
+    p.brazos[0].rotation.z = -ola;
+    p.brazos[1].rotation.z = ola;
+    p.sombra.scale.setScalar(Math.max(0.15, 0.5 - h * 0.45));
+  }
+}
+
+function saltarPersonaje(k) {
+  const p = personajes[k];
+  const t = performance.now() / 1000;
+  if (t - p.salto < 1.1) return;
+  p.salto = t;
+  chispas.lanzar(p.raiz.position.clone().add(new V3(0, 0.45, 0)), 30, 0.8);
+}
+
 /* ═════════════════════ Cámara ═════════════════════ */
 
 const vertical = () => camara.aspect < 1;
@@ -1013,8 +1152,9 @@ lienzo.addEventListener('pointerup', (e) => {
   const rect = lienzo.getBoundingClientRect();
   puntero.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
   rayo.setFromCamera(puntero, camara);
-  const hit = rayo.intersectObjects(toques, false)[0];
-  if (hit) abrirTarjeta(hit.object.userData.indice);
+  const hit = rayo.intersectObjects([...toquesPersonajes, ...toques], false)[0];
+  if (hit && hit.object.userData.personaje !== undefined) saltarPersonaje(hit.object.userData.personaje);
+  else if (hit) abrirTarjeta(hit.object.userData.indice);
   else if (tarjetaAbierta !== null) cerrarTarjeta();
 });
 
@@ -1135,6 +1275,7 @@ function bucle() {
     petalosCaen.malla.instanceMatrix.needsUpdate = true;
   }
 
+  moverPersonajes(t);
   chispas.actualizar(dt);
   for (const m of rocasFlotantes) {
     m.position.y = m.userData.y0 + Math.sin(t * 0.6 + m.userData.fase) * 0.12;
@@ -1165,4 +1306,4 @@ function bucle() {
 
 window.addEventListener('resize', ajustarCamara);
 requestAnimationFrame(bucle);
-if (params.has('debug')) window.jardin = { renderer, escena, flores };
+if (params.has('debug')) window.jardin = { renderer, escena, flores, camara, controles, personajes };
