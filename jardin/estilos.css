@@ -125,6 +125,17 @@ html, body {
   box-shadow: 0 12px 34px rgba(157, 78, 221, 0.45);
 }
 .boton:disabled { opacity: 0.55; cursor: default; }
+.boton.redondo {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-left: auto;
+  padding: 0;
+  font-size: 18px;
+  pointer-events: auto;
+}
+.boton.redondo.apagado { opacity: 0.7; }
 
 /* ---------- Portada ---------- */
 #intro {

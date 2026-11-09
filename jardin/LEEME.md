@@ -6,6 +6,8 @@ Un jardín en 3D con una flor por cada día juntos. Cada día brota una nueva.
 - **Los demás días** solo ve crecer la flor nueva, sin mensajes.
 - **En la esquina** hay un contador de días juntos y de flores.
 - Al tocar una flor, sale qué día juntos representa, o un mensaje escondido si le has puesto uno.
+- **Chiikawa, Hachiware y Usagi** dan la vuelta al jardín dando saltitos. Parpadean, y si los tocas pegan un salto con cara de felicidad.
+- **Música lo-fi tranquila** generada en el propio navegador (`musica.js`), sin archivos de audio. Empieza al pulsar «Entrar al jardín» y se puede silenciar con el botón 🎵 de arriba a la derecha. El jardín recuerda la elección.
 
 ## Personalizarlo
 
