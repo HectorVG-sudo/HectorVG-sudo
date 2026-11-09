@@ -1141,10 +1141,11 @@ function tocarPersonaje(k) {
   const t = performance.now() / 1000;
   if (amigos.saltar(k, t)) {
     chispas.lanzar(p.raiz.getWorldPosition(new V3()).add(new V3(0, p.cima * 0.75, 0)), 26, 0.8);
-    musica.efecto('salto');
     vibrar(12);
+    decir(k);
+    const dura = musica.voz(p.tipo, p.frases[p.frase]); // dice con su voz lo que pone en el bocadillo
+    burbuja.fin = Math.max(burbuja.fin, t + dura + 0.4); // el bocadillo no se va antes de que acabe de hablar
   }
-  decir(k);
   if (tarjetaAbierta !== null) cerrarTarjeta(false);
   if (enfoque !== k) {
     enfoque = k;

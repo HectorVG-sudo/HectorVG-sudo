@@ -162,21 +162,21 @@ const DATOS = {
     ojos: { lon: 18, y: 0.012, r: 0.029 },
     mejilla: { lon: 33, y: -0.025, rx: 0.044, ry: 0.028 },
     boca: { y: -0.035, w: 0.057, h: 0.019, pico: 0.15, labio: -0.066 },
-    frases: ['¡Wa…!', '¡Fuu!', '¡Yaa!', 'Wa… ¡waaa!', '💜'],
+    frases: ['¡Yadaaa!'], // cada frase tiene su grabación en voces/ (lista CLIPS de musica.js)
   },
   hachiware: {
     nombre: 'Hachiware', piel: '#ffffff', azul: '#8dcbe9', patas: 0, hombro: [0.19, 0.205], brazo: 0.62, cima: 0.6, ritmo: 1.7,
     ojos: { lon: 17.5, y: 0.01, r: 0.029 },
     mejilla: { lon: 34, y: -0.038, rx: 0.045, ry: 0.03 },
     boca: { y: -0.037, w: 0.06, h: 0.019, pico: 0.95, labio: -0.099 },
-    frases: ['¡Nantoka nare!', '¡Todo va a salir bien!', '¡Mira cuántas flores!', '¡Qué bien se está aquí!'],
+    frases: ['¡Oi!', '¿Nani nani?', 'Zen zen wakannai…'],
   },
   usagi: {
     nombre: 'Usagi', piel: '#f8e8b2', patas: 0.022, hombro: [0.198, 0.2], brazo: 0.14, cima: 0.9, ritmo: 2.5,
     ojos: { lon: 19, y: 0.014, r: 0.029 },
     mejilla: { lon: 37.5, y: -0.037, rx: 0.05, ry: 0.029 },
     boca: { y: -0.035, w: 0.062, h: 0.019, pico: 0.55, labio: -0.093 },
-    frases: ['¡Yahá!', '¡Urá!', '¡Puru puru puru!', '¿¡Haaa!?', '¡Fuun!'],
+    frases: ['¡Yahaaa!', '¡Urá!', '¡Purya!', '¿¡Haaaa!?', '¿Huh?'],
   },
 };
 

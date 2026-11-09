@@ -1,9 +1,25 @@
 // ─────────────────────────────────────────────────────────────
 //  Música lo-fi tranquila, generada en el navegador en tiempo real.
-//  No usa archivos de audio (nada que descargar ni derechos de autor):
-//  piano eléctrico, bajo suave, batería muy floja, campanitas que
-//  improvisan y un poco de crujido de vinilo.
+//  La música no usa archivos de audio: piano eléctrico, bajo suave,
+//  batería muy floja, campanitas que improvisan y un poco de crujido
+//  de vinilo. Lo único grabado son las voces de los personajes
+//  (carpeta voces/).
 // ─────────────────────────────────────────────────────────────
+
+// Grabaciones de voz: lo que pone en el bocadillo (frases de personajes.js) → archivo
+// de voces/. Van atadas por el texto, así el audio siempre dice lo que está escrito.
+const CLIPS = {
+  '¡Yadaaa!': 'chiikawa-yada',
+  '¡Oi!': 'hachiware-oi',
+  '¿Nani nani?': 'hachiware-nani',
+  'Zen zen wakannai…': 'hachiware-zenzen',
+  '¡Yahaaa!': 'usagi-yaha',
+  '¡Urá!': 'usagi-ura',
+  '¡Purya!': 'usagi-puru',
+  '¿¡Haaaa!?': 'usagi-haa',
+  '¿Huh?': 'usagi-huh',
+};
+const VOLUMEN_CLIPS = 0.6;
 
 const TEMPO = 72;
 const NEGRA = 60 / TEMPO;
@@ -22,7 +38,9 @@ const ESCALA = [69, 72, 74, 76, 79, 81, 84, 86]; // pentatónica para las campan
 
 export function crearMusica() {
   let ctx = null;
-  let final, salida, reverb, eco, teclas, bajos, bateria, campanas, ruidoBlanco;
+  let final, salida, reverb, eco, teclas, bajos, bateria, campanas, grabadas, ruidoBlanco;
+  const clips = {}; // 'usagi-yaha' → AudioBuffer, cuando termina de descargarse
+  const sonando = {}; // tipo → grabación que está sonando ahora
   let paso = 0;
   let siguiente = 0;
   let nota = 3;
@@ -111,6 +129,10 @@ export function crearMusica() {
     campanas.connect(eco);
     campanas.connect(reverb);
 
+    // Las grabaciones van directas a la salida, sin el filtro cálido de la música
+    grabadas = ganancia(VOLUMEN_CLIPS, final);
+    grabadas.connect(ganancia(0.1, reverb));
+
     // Ruido blanco reutilizable (caja y platillos)
     ruidoBlanco = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const rb = ruidoBlanco.getChannelData(0);
@@ -188,6 +210,17 @@ export function crearMusica() {
     oscilador('sine', f * 3.01, t, t + 0.8, envolvente(t, vel * 0.13, 0.003, 0.7, destino));
   }
 
+  // Descarga las grabaciones en segundo plano
+  function cargarClips() {
+    for (const nombre of Object.values(CLIPS)) {
+      fetch(new URL(`./voces/${nombre}.mp3`, import.meta.url))
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject()))
+        .then((datos) => new Promise((ok, mal) => ctx.decodeAudioData(datos, ok, mal)))
+        .then((buffer) => { clips[nombre] = buffer; })
+        .catch(() => {});
+    }
+  }
+
   /* ---------- La canción ---------- */
 
   function tocar(p, t) {
@@ -246,6 +279,7 @@ export function crearMusica() {
       if (ctx) return;
       try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {} // suena aunque el iPhone esté en silencio
       try { montar(); } catch { ctx = null; return; }
+      cargarClips();
       ctx.resume?.();
       siguiente = ctx.currentTime + 0.2;
       setInterval(programar, 120);
@@ -287,6 +321,22 @@ export function crearMusica() {
       } else if (tipo === 'flor') {
         [72, 76, 79, 83, 86].forEach((m, i) => campana(m, t + i * 0.09, 0.09));
       }
+    },
+
+    // Un personaje dice en voz alta lo que pone en su bocadillo, si esa frase tiene
+    // grabación (si no, se queda callado). Devuelve cuántos segundos dura.
+    voz(tipo, texto) {
+      if (!ctx || silenciada || ctx.state !== 'running') return 0;
+      try { sonando[tipo]?.stop(); } catch {}
+      sonando[tipo] = null;
+      const buffer = clips[CLIPS[texto]];
+      if (!buffer) return 0;
+      const f = ctx.createBufferSource();
+      f.buffer = buffer;
+      f.connect(grabadas);
+      f.start(ctx.currentTime + 0.03);
+      sonando[tipo] = f;
+      return buffer.duration;
     },
 
     _depurar: () => ({ ctx, final }),
