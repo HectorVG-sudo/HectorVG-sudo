@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nuestro jardín</title>
+  <meta name="description" content="Un jardín de flores moradas que crece un poquito cada día.">
+  <meta name="theme-color" content="#160c2c">
+  <meta property="og:title" content="Nuestro jardín 💜">
+  <meta property="og:description" content="Cada día brota una flor nueva para ti.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💜</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Nunito:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="estilos.css">
+  <script type="importmap">
+    { "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/" } }
+  </script>
+  <script type="module" src="./main.js"></script>
+</head>
+<body>
+  <canvas id="escena" aria-label="Jardín en 3D con flores moradas"></canvas>
+
+  <header id="hud" class="oculto">
+    <div class="pildora"><strong id="hudDia">Día 1</strong><span id="hudFlores"></span></div>
+    <div class="pildora" id="hudCuenta" hidden></div>
+    <div class="pildora vista" id="hudVista" hidden></div>
+  </header>
+
+  <p id="pista" class="oculto">Toca una flor para leerla · arrastra para girar</p>
+  <nav id="acciones" class="oculto">
+    <button id="btnHoy" class="boton" type="button">🌸 Flor de hoy</button>
+    <button id="btnFinal" class="boton" type="button" hidden>💌 Mensaje final</button>
+    <a id="btnCancion" class="boton" hidden target="_blank" rel="noopener">🎵 Nuestra canción</a>
+  </nav>
+
+  <section id="intro">
+    <div class="intro-caja">
+      <p class="para" id="introPara">Para ti 💜</p>
+      <h1>Nuestro jardín</h1>
+      <p class="intro-texto" id="introTexto">Preparando las flores…</p>
+      <button id="btnEntrar" class="boton grande" type="button" disabled>Cargando…</button>
+      <p class="firma" id="introFirma"></p>
+    </div>
+  </section>
+
+  <article id="tarjeta" hidden aria-live="polite">
+    <button class="cerrar" id="btnCerrar" type="button" aria-label="Cerrar">×</button>
+    <p class="etiqueta" id="tarjetaEtiqueta"></p>
+    <img id="tarjetaFoto" alt="" hidden>
+    <p class="mensaje" id="tarjetaTexto"></p>
+    <div class="nav-tarjeta" id="tarjetaNav">
+      <button id="btnAnterior" class="enlace" type="button">‹ Anterior</button>
+      <button id="btnSiguiente" class="enlace" type="button">Siguiente ›</button>
+    </div>
+  </article>
+
+  <div id="error" hidden></div>
+</body>
+</html>
