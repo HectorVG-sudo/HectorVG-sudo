@@ -22,7 +22,11 @@
   <canvas id="escena" aria-label="Jardín en 3D con flores moradas"></canvas>
 
   <header id="hud" class="oculto">
-    <div class="pildora"><strong id="hudDia">Día 1</strong><span id="hudFlores"></span></div>
+    <div class="pildora contador" id="hudContador">
+      <span>💜 <strong id="hudDias">0</strong> <span id="hudDiasTxt">días juntos</span></span>
+      <span class="sep" aria-hidden="true">·</span>
+      <span>🌸 <strong id="hudFlores">0</strong> <span id="hudFloresTxt">flores</span></span>
+    </div>
     <div class="pildora" id="hudCuenta" hidden></div>
     <div class="pildora vista" id="hudVista" hidden></div>
   </header>
@@ -30,7 +34,7 @@
   <p id="pista" class="oculto">Toca una flor para leerla · arrastra para girar</p>
   <nav id="acciones" class="oculto">
     <button id="btnHoy" class="boton" type="button">🌸 Flor de hoy</button>
-    <button id="btnFinal" class="boton" type="button" hidden>💌 Mensaje final</button>
+    <button id="btnCarta" class="boton" type="button">💌 Tu carta</button>
     <a id="btnCancion" class="boton" hidden target="_blank" rel="noopener">🎵 Nuestra canción</a>
   </nav>
 
@@ -49,6 +53,7 @@
     <p class="etiqueta" id="tarjetaEtiqueta"></p>
     <img id="tarjetaFoto" alt="" hidden>
     <p class="mensaje" id="tarjetaTexto"></p>
+    <p class="firma-carta" id="tarjetaFirma" hidden></p>
     <div class="nav-tarjeta" id="tarjetaNav">
       <button id="btnAnterior" class="enlace" type="button">‹ Anterior</button>
       <button id="btnSiguiente" class="enlace" type="button">Siguiente ›</button>

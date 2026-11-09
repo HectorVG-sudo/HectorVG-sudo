@@ -2,57 +2,47 @@
 //  💜  EL JARDÍN DE FLORES MORADAS — edita solo este archivo  💜
 // ─────────────────────────────────────────────────────────────
 //
-//  Cada mensaje de "flores" es una flor. La primera brota el día
-//  de "inicio", la segunda al día siguiente, y así hasta la última.
+//  El jardín tiene una flor por cada día que lleváis juntos, desde
+//  "inicio". Cada día brota una nueva, para siempre.
 //
 //  Reglas para no romper nada:
-//   · Cada mensaje va entre comillas "..." y termina con una coma.
+//   · Los textos van entre comillas "..." y cada línea termina con una coma.
 //   · Si quieres comillas dentro del texto, usa ‘ ’ o « ».
-//   · Para un salto de línea dentro de un mensaje, escribe \n
-//   · Para añadir una foto a una flor, súbela a la carpeta jardin/fotos/
-//     y escribe la flor así:
-//        { texto: "Nuestra primera videollamada", foto: "fotos/llamada.jpg" },
+//   · Para un salto de línea dentro de un texto, escribe \n
 //
-//  Para ver cómo se verá un día concreto sin esperar, abre la página
-//  con ?dia=5 al final del link (por ejemplo .../jardin/?dia=5).
+//  Para probarlo sin esperar:
+//   · .../jardin/?dia=50            → cómo se verá el día 50 juntos
+//   · .../jardin/?dia=50&primera    → lo mismo, como si fuera su primera vez
+//   · .../jardin/?reiniciar         → olvida la visita (vuelve a salir la carta)
 // ─────────────────────────────────────────────────────────────
 
 export default {
-  // Cómo se llama ella (o cómo le dices). Sale en la portada y en el cartel.
-  para: "Mi amor",
+  // Cómo le dices. Sale en la portada ("Para …") y en el cartel del jardín.
+  para: "mi princesita",
 
-  // Tu firma.
+  // Tu firma (sale al final de la carta).
   de: "Héctor",
 
-  // Día en que brota la PRIMERA flor (año-mes-día).
-  inicio: "2026-11-09",
+  // El día que empezasteis (año-mes-día). Ese día brotó la primera flor.
+  inicio: "2026-09-25",
 
-  // Día en que os volvéis a ver (año-mes-día). Déjalo en "" si aún no hay fecha.
+  // Día en que os volvéis a ver (año-mes-día). Activa una cuenta atrás.
+  // Déjalo en "" si aún no hay fecha.
   reencuentro: "",
 
   // Opcional: link a vuestra canción (Spotify, YouTube…). "" para ocultarlo.
   cancion: "",
 
-  // Se muestra cuando ya han brotado todas las flores.
-  mensajeFinal:
-    "Nuestro jardín ya está completo, pero lo que siento por ti sigue creciendo.\nGracias por regarlo conmigo cada día, aunque estemos lejos.\n\nTe quiero muchísimo. 💜",
+  // La carta que le sale SOLO la primera vez que entra.
+  // (Luego la puede releer con el botón «💌 Tu carta»).
+  bienvenida:
+    "Hola princesita 💜\nEs el día de las flores moradas, así que te he hecho esto.\n\nEste es nuestro jardín: tiene una flor por cada día que llevamos juntos. Cada día va a nacer una nueva, para que aunque estemos lejos nunca te falten flores mías.",
 
-  // ✏️ EJEMPLOS: cámbialos por recuerdos, chistes internos y cosas vuestras.
-  // Cuantos más pongas, más días crece el jardín.
-  flores: [
-    "Hoy brotó la primera flor de nuestro jardín. Cada día va a nacer una nueva, para que aunque estemos lejos nunca te falten flores mías. 💜",
-    "Esta es por tu risa. Es mi sonido favorito del mundo, incluso cuando llega con retraso por la videollamada.",
-    "Esta es por todas las noches que nos quedamos hablando aunque al día siguiente tocara madrugar.",
-    "Una flor por cada vez que me haces sentir en casa, aunque haya kilómetros entre nosotros.",
-    "Esta es para tus días malos: vuelve aquí y acuérdate de que hay alguien lejos que piensa en ti todo el rato.",
-    "Esta es por lo valiente que eres. Te admiro más de lo que te digo.",
-    "Dicen que las flores moradas significan admiración. Ya sabes por qué te regalo un jardín entero.",
-    "Esta es por la primera vez que hablamos. No tenía ni idea de lo mucho que me ibas a cambiar la vida.",
-    "La distancia solo es el tiempo que falta para el siguiente abrazo.",
-    "Esta es por tus mensajes de buenos días. Hacen que cualquier mañana merezca la pena.",
-    "Una flor por todo lo que vamos a hacer juntos cuando por fin estemos en el mismo sitio.",
-    "Esta es porque sí. Porque te quiero y punto.",
-    "Si pudiera, te llevaría este jardín en persona. De momento te lo dejo aquí, para que lo riegues cuando me eches de menos.",
-    "Gracias por esperarme, por elegirme y por quedarte. Te quiero muchísimo.",
-  ],
+  // Opcional: mensajes escondidos en las flores de días concretos.
+  // Ella los encuentra al tocar la flor de ese día. Las demás flores
+  // muestran qué día juntos representan.
+  // Para poner una foto: "2026-10-12": { texto: "…", foto: "fotos/foto.jpg" },
+  mensajes: {
+    "2026-09-25": "El día que empezó todo 💜",
+  },
 };

@@ -62,6 +62,8 @@ html, body {
   backdrop-filter: blur(10px);
 }
 .pildora span { color: var(--suave); }
+.contador strong { color: var(--tinta); font-weight: 700; }
+.contador .sep { opacity: 0.6; }
 .pildora.vista { background: rgba(120, 60, 20, 0.7); font-size: 12px; }
 
 #pista {
@@ -226,6 +228,14 @@ h1 {
   border: none;
   border-radius: 10px;
   cursor: pointer;
+}
+.firma-carta {
+  margin: 0 0 14px;
+  text-align: right;
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--acento-claro);
 }
 .nav-tarjeta {
   display: flex;
