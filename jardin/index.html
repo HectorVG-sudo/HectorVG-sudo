@@ -6,6 +6,10 @@
   <title>Nuestro jardín</title>
   <meta name="description" content="Un jardín de flores moradas que crece un poquito cada día.">
   <meta name="theme-color" content="#160c2c">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Nuestro jardín">
   <meta property="og:title" content="Nuestro jardín 💜">
   <meta property="og:description" content="Cada día brota una flor nueva para ti.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💜</text></svg>">
@@ -13,8 +17,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Nunito:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="estilos.css">
-  <script type="importmap">
-    { "imports": { "three": "./lib/three.module.min.js", "three/addons/": "./lib/" } }
+  <link rel="modulepreload" href="./lib/three.module.min.js">
+  <script>
+    // Si algo falla al cargar (móvil muy antiguo, mala conexión…), que no se quede en «Cargando…» para siempre
+    window.addEventListener('error', function (e) {
+      var caja = document.getElementById('error');
+      if (!caja || !caja.hidden || window.jardinListo) return;
+      if (e.target && e.target.tagName && e.target.tagName !== 'SCRIPT') return;
+      caja.textContent = 'El jardín no ha podido cargarse 😢 Prueba a recargar la página o a abrirla con Chrome o Safari actualizados.';
+      caja.hidden = false;
+    }, true);
   </script>
   <script type="module" src="./main.js"></script>
 </head>
@@ -29,7 +41,10 @@
     </div>
     <div class="pildora" id="hudCuenta" hidden></div>
     <div class="pildora vista" id="hudVista" hidden></div>
-    <button id="btnMusica" class="boton redondo" type="button" aria-label="Silenciar la música" hidden>🎵</button>
+    <div class="hud-botones">
+      <button id="btnVista" class="boton redondo" type="button" aria-label="Ver todo el jardín" title="Ver todo el jardín" hidden>🏝️</button>
+      <button id="btnMusica" class="boton redondo" type="button" aria-label="Silenciar la música" hidden>🎵</button>
+    </div>
   </header>
 
   <p id="pista" class="oculto">Toca una flor para leerla · arrastra para girar</p>
@@ -60,6 +75,8 @@
       <button id="btnSiguiente" class="enlace" type="button">Siguiente ›</button>
     </div>
   </article>
+
+  <div id="burbuja" hidden aria-live="polite"></div>
 
   <div id="error" hidden></div>
 </body>

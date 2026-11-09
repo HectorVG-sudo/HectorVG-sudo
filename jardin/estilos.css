@@ -19,9 +19,18 @@ html, body {
   color: var(--tinta);
   font-family: "Nunito", system-ui, -apple-system, sans-serif;
   overflow: hidden;
+  overscroll-behavior: none; /* sin «tirar para recargar» en el móvil */
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
+body { position: fixed; inset: 0; }
+#tarjeta { -webkit-user-select: text; user-select: text; }
+button, a { touch-action: manipulation; }
 
 #escena {
   position: fixed;
@@ -130,12 +139,12 @@ html, body {
   place-items: center;
   width: 42px;
   height: 42px;
-  margin-left: auto;
   padding: 0;
   font-size: 18px;
   pointer-events: auto;
 }
 .boton.redondo.apagado { opacity: 0.7; }
+.hud-botones { display: flex; gap: 8px; margin-left: auto; }
 
 /* ---------- Portada ---------- */
 #intro {
@@ -184,7 +193,10 @@ h1 {
   bottom: var(--abajo);
   width: min(520px, calc(100% - 32px));
   max-height: 52vh;
+  max-height: 52dvh;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 22px 22px 12px;
   background: var(--panel-fuerte);
   border: 1px solid var(--borde);
@@ -270,6 +282,44 @@ h1 {
 }
 .enlace:disabled { opacity: 0.3; cursor: default; }
 
+/* ---------- Lo que dicen Chiikawa y sus amigos ---------- */
+#burbuja {
+  position: fixed;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  max-width: min(260px, 70vw);
+  padding: 9px 15px;
+  font: 700 16px/1.25 "Nunito", system-ui, sans-serif;
+  color: #3b2748;
+  text-align: center;
+  white-space: nowrap;
+  background: #fffaff;
+  border: 2px solid #3b2748;
+  border-radius: 18px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  will-change: transform;
+  animation: brotar 0.28s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+#burbuja::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: #fffaff;
+  border-right: 2px solid #3b2748;
+  border-bottom: 2px solid #3b2748;
+  transform: rotate(45deg);
+}
+@keyframes brotar {
+  from { opacity: 0; scale: 0.6; }
+  to   { opacity: 1; scale: 1; }
+}
+
 #error {
   position: fixed;
   z-index: 10;
@@ -289,7 +339,36 @@ h1 {
   #tarjeta { padding: 26px 28px 14px; }
 }
 
+/* Móviles: sin desenfoques de fondo (cuestan mucho encima del 3D) */
+@media (pointer: coarse) {
+  .pildora, .boton, #intro, #tarjeta {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .pildora, .boton { background: rgba(30, 16, 56, 0.86); }
+  .boton.destacado { background: rgba(140, 66, 204, 0.9); }
+  #intro { background: radial-gradient(ellipse at 50% 42%, rgba(40, 18, 76, 0.72), rgba(14, 7, 28, 0.95) 75%); }
+  #tarjeta { background: rgba(26, 13, 48, 0.96); }
+  .boton { min-height: 44px; }
+  .boton.redondo { width: 44px; height: 44px; }
+}
+
+/* Móvil tumbado: todo más compacto */
+@media (max-height: 480px) {
+  h1 { font-size: 40px; margin-bottom: 10px; }
+  .intro-texto { margin-bottom: 16px; font-size: 15px; }
+  .firma { margin-top: 12px; }
+  #pista { display: none; }
+  #tarjeta { max-height: 70vh; max-height: 70dvh; }
+  .mensaje { font-size: 18px; }
+}
+
+@media (max-width: 380px) {
+  .pildora { padding: 7px 11px; font-size: 13px; gap: 6px; }
+  .boton { padding: 12px 15px; font-size: 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  #tarjeta { animation: none; }
+  #tarjeta, #burbuja { animation: none; }
   #intro, #hud, #acciones, #pista { transition: none; }
 }

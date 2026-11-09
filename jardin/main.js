@@ -1,6 +1,7 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/OrbitControls.js';
+import * as THREE from './lib/three.module.min.js';
+import { OrbitControls } from './lib/OrbitControls.js';
 import { crearMusica } from './musica.js';
+import { crearPersonajes, MANTA } from './personajes.js';
 
 /* ═════════════════════ Utilidades ═════════════════════ */
 
@@ -17,6 +18,7 @@ const V3 = THREE.Vector3;
 const musica = crearMusica();
 const ARRIBA = new V3(0, 1, 0);
 const plural = (n, uno, varios) => (n === 1 ? uno : varios);
+const vibrar = (ms) => { try { navigator.vibrate?.(ms); } catch { /* sin vibración */ } };
 
 function mostrarError(msg) {
   const e = $('error');
@@ -110,17 +112,46 @@ vistas = Math.max(0, vistas, ABIERTAS - 7); // como mucho, 7 flores creciendo a 
 const NUEVAS = [];
 for (let i = vistas; i < ABIERTAS; i++) NUEVAS.push(i);
 
+/* ═════════════════════ Calidad según el dispositivo ═════════════════════
+   En el móvil se dibuja con menos detalle para que vaya fluido. Además, si
+   aun así va lento, el propio jardín baja la resolución sobre la marcha.
+   Se puede forzar con ?calidad=alta, ?calidad=media o ?calidad=baja. */
+
+const TACTIL = matchMedia('(pointer: coarse)').matches;
+const NIVEL = (() => {
+  const pedido = params.get('calidad');
+  if (['alta', 'media', 'baja'].includes(pedido)) return pedido;
+  const pequeno = Math.min(screen.width, screen.height) < 700;
+  if (!TACTIL && !pequeno) return 'alta';
+  return navigator.deviceMemory && navigator.deviceMemory <= 3 ? 'baja' : 'media';
+})();
+const Q = {
+  alta: { dpr: 2, dprMin: 1, suavizado: true, hierba: 95, hierbaMax: 26000, detalle: 1, estrellas: 700, nubes: 26, pbr: true, caras: 768, mariposas: 6 },
+  media: { dpr: 1.75, dprMin: 1, suavizado: true, hierba: 55, hierbaMax: 12000, detalle: 0.7, estrellas: 500, nubes: 18, pbr: false, caras: 512, mariposas: 5 },
+  baja: { dpr: 1.25, dprMin: 0.8, suavizado: false, hierba: 30, hierbaMax: 6000, detalle: 0.5, estrellas: 350, nubes: 12, pbr: false, caras: 512, mariposas: 3 },
+}[NIVEL];
+// Cuantas más flores haya, más sencilla se dibuja cada una en el móvil: así el jardín sigue yendo fluido dentro de años.
+if (NIVEL !== 'alta') Q.detalle *= Math.min(1, Math.sqrt((NIVEL === 'media' ? 160 : 90) / Math.max(1, ABIERTAS)));
+const seg = (n, min = 3) => Math.max(min, Math.round(n * Q.detalle));
+// Material con brillos realistas en ordenador; uno más ligero en el móvil
+function material(p) {
+  if (Q.pbr) return new THREE.MeshStandardMaterial(p);
+  const { roughness, metalness, ...resto } = p;
+  return new THREE.MeshLambertMaterial(resto);
+}
+
 /* ═════════════════════ Render y escena ═════════════════════ */
 
 const lienzo = $('escena');
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: Q.suavizado, powerPreference: 'high-performance' });
 } catch (e) {
   mostrarError('Tu navegador no puede mostrar el jardín en 3D 😢 Prueba a abrirlo con Chrome o Safari.');
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+let ratio = Math.min(window.devicePixelRatio || 1, Q.dpr);
+renderer.setPixelRatio(ratio);
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -132,9 +163,13 @@ const camara = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerH
 const controles = new OrbitControls(camara, lienzo);
 controles.enableDamping = true;
 controles.dampingFactor = 0.07;
-controles.enablePan = false;
-controles.minDistance = 1.6;
-controles.maxPolarAngle = 1.42;
+controles.enablePan = true; // con dos dedos (o el botón derecho) se mueve la vista
+controles.screenSpacePanning = true;
+controles.panSpeed = 0.9;
+controles.zoomToCursor = true; // el zoom va hacia donde pellizcas o donde está el ratón
+controles.minDistance = 1.3;
+controles.maxPolarAngle = 1.42; // se recalcula en cada cuadro: puede bajar hasta ras de hierba
+controles.cursor.set(0, 0.8, 0);
 controles.rotateSpeed = 0.7;
 controles.autoRotateSpeed = 0.45;
 const MOVIMIENTO_REDUCIDO = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -161,9 +196,35 @@ const TEX_SOMBRA = texturaRadial([[0, 'rgba(0,0,0,.55)'], [0.6, 'rgba(0,0,0,.2)'
 
 const ESPACIO = 0.62; // separación entre flores (espiral)
 // La isla crece a medida que brotan flores (+1 por el brote de mañana).
-const RADIO = Math.max(3.2, ESPACIO * Math.sqrt(ABIERTAS + 2) + 1.4);
+const RADIO = Math.max(3.4, ESPACIO * Math.sqrt(ABIERTAS + 2) + 1.55);
 const borde = (a) => 1 + 0.045 * Math.sin(a * 5 + 1.3) + 0.025 * Math.sin(a * 11 + 0.4) + 0.015 * Math.sin(a * 17);
 const ANG_CARTEL = Math.PI / 2 + 0.62;
+const difAngulo = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+// Sitio de la manta de Chiikawa y sus amigos: el saliente más ancho de la
+// parte de delante de la isla, lo más cerca del borde que quepa entera.
+const SITIO = (() => {
+  let mejor = null;
+  for (let a = 0.95; a <= 1.72; a += 0.02) {
+    let r = RADIO * 1.12;
+    const cabe = () => {
+      for (let k = -4; k <= 4; k++) {
+        const x = (k / 4) * (MANTA.ancho / 2), z = r + MANTA.fondo / 2;
+        if (Math.hypot(x, z) > RADIO * borde(a - Math.atan2(x, z)) - 0.22) return false;
+      }
+      return true;
+    };
+    while (r > 1 && !cabe()) r -= 0.02;
+    if (!mejor || r > mejor.r) mejor = { a, r };
+  }
+  const ca = Math.cos(mejor.a), sa = Math.sin(mejor.a);
+  return { ...mejor, ca, sa, x: ca * mejor.r, z: sa * mejor.r, medioAngulo: Math.atan2(MANTA.ancho / 2 + 0.35, mejor.r) };
+})();
+function enManta(x, z, margen = 0.07) {
+  const dx = x - SITIO.x, dz = z - SITIO.z;
+  return Math.abs(dx * SITIO.sa - dz * SITIO.ca) < MANTA.ancho / 2 + margen
+    && Math.abs(dx * SITIO.ca + dz * SITIO.sa) < MANTA.fondo / 2 + margen;
+}
 
 /* ---------- Cielo de atardecer ---------- */
 {
@@ -203,7 +264,7 @@ const ANG_CARTEL = Math.PI / 2 + 0.62;
 
   // Estrellas
   const r = azar(77);
-  const n = 700;
+  const n = Q.estrellas;
   const pos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
     const th = r() * Math.PI * 2;
@@ -237,7 +298,7 @@ const ANG_CARTEL = Math.PI / 2 + 0.62;
   const r = azar(404);
   const tex = texturaRadial([[0, 'rgba(255,255,255,.85)'], [0.45, 'rgba(255,255,255,.35)'], [1, 'rgba(255,255,255,0)']]);
   const tonos = ['#f0b8e0', '#c9a0f0', '#e6a8d0', '#b892e8'];
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < Q.nubes; i++) {
     const a = r() * Math.PI * 2;
     const rr = RADIO + 2 + r() * 38;
     const nube = new THREE.Sprite(
@@ -275,25 +336,26 @@ function deformarRadial(geo, fn) {
   const cesped = new THREE.CylinderGeometry(RADIO, RADIO, 0.34, 72, 1);
   cesped.translate(0, -0.17, 0);
   deformarRadial(cesped, (a) => borde(a));
-  escena.add(new THREE.Mesh(cesped, new THREE.MeshStandardMaterial({ color: '#3f7642', roughness: 1 })));
+  escena.add(new THREE.Mesh(cesped, material({ color: '#3f7642', roughness: 1 })));
 
   const tierra = new THREE.CylinderGeometry(RADIO * 0.985, RADIO * 0.84, 0.55, 72, 2);
   tierra.translate(0, -0.34 - 0.275, 0);
   deformarRadial(tierra, (a, v) => borde(a) * (1 + (ruido3(v.x, v.y, v.z) - 0.5) * 0.04));
-  escena.add(new THREE.Mesh(tierra, new THREE.MeshStandardMaterial({ color: '#5b3d2e', roughness: 1 })));
+  escena.add(new THREE.Mesh(tierra, material({ color: '#5b3d2e', roughness: 1 })));
 
   const altoRoca = RADIO * 1.3;
   const roca = new THREE.ConeGeometry(RADIO * 0.84, altoRoca, 12, 5);
   roca.rotateX(Math.PI);
   roca.translate(0, -0.89 - altoRoca / 2, 0);
   deformarRadial(roca, (a, v) => borde(a) * (v.y > -0.9 ? 1 : 1 + (ruido3(v.x, v.y, v.z) - 0.5) * 0.35));
-  escena.add(new THREE.Mesh(roca, new THREE.MeshStandardMaterial({ color: '#4d4061', roughness: 0.95, flatShading: true })));
+  escena.add(new THREE.Mesh(roca, material({ color: '#4d4061', roughness: 0.95, flatShading: true })));
 }
 
 /* ---------- Hierba que se mueve con el viento ---------- */
+let pasto;
 {
   const r = azar(2024);
-  const n = Math.min(26000, Math.floor(Math.PI * RADIO * RADIO * 95));
+  const n = Math.min(Q.hierbaMax, Math.floor(Math.PI * RADIO * RADIO * Q.hierba));
   const geo = new THREE.ConeGeometry(0.022, 0.16, 3, 1, true); // sin base: nunca se ve
   geo.translate(0, 0.08, 0);
   const mat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
@@ -312,7 +374,7 @@ function deformarRadial(geo, fn) {
         #endif`
       );
   };
-  const pasto = new THREE.InstancedMesh(geo, mat, n);
+  pasto = new THREE.InstancedMesh(geo, mat, n);
   const d = new THREE.Object3D();
   const c = new THREE.Color();
   for (let i = 0; i < n; i++) {
@@ -321,6 +383,7 @@ function deformarRadial(geo, fn) {
     d.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr);
     d.rotation.set((r() - 0.5) * 0.35, r() * Math.PI * 2, (r() - 0.5) * 0.35);
     d.scale.set(1, 0.55 + r() * 0.9, 1);
+    if (enManta(d.position.x, d.position.z)) d.scale.setScalar(0); // la manta aplasta la hierba
     d.updateMatrix();
     pasto.setMatrixAt(i, d.matrix);
     c.setHSL(0.29 + r() * 0.07, 0.5 + r() * 0.2, 0.24 + r() * 0.14);
@@ -333,8 +396,8 @@ function deformarRadial(geo, fn) {
 const rocasFlotantes = [];
 {
   const r = azar(99);
-  const matArbusto = new THREE.MeshStandardMaterial({ color: '#2f6a3c', roughness: 0.9, flatShading: true });
-  const matPiedra = new THREE.MeshStandardMaterial({ color: '#6d6280', roughness: 0.9, flatShading: true });
+  const matArbusto = material({ color: '#2f6a3c', roughness: 0.9, flatShading: true });
+  const matPiedra = material({ color: '#6d6280', roughness: 0.9, flatShading: true });
   const geoArbusto = new THREE.IcosahedronGeometry(0.32, 1);
   const geoPiedra = new THREE.DodecahedronGeometry(0.14, 0);
   const n = Math.round(RADIO * 2.6);
@@ -342,6 +405,7 @@ const rocasFlotantes = [];
     const a = (i / n) * Math.PI * 2 + (r() - 0.5) * 0.5;
     const dif = Math.atan2(Math.sin(a - ANG_CARTEL), Math.cos(a - ANG_CARTEL));
     if (Math.abs(dif) < 0.45 * (3.6 / Math.max(3.6, RADIO))) continue;
+    if (Math.abs(difAngulo(a, SITIO.a)) < SITIO.medioAngulo) continue; // que no tapen a Chiikawa y sus amigos
     const rr = RADIO * borde(a) - 0.32;
     const m = new THREE.Mesh(geoArbusto, matArbusto);
     const s = 0.7 + r() * 0.7;
@@ -411,8 +475,8 @@ const rocasFlotantes = [];
       .then(dibujar)
       .catch(() => {});
   }
-  const madera = new THREE.MeshStandardMaterial({ color: '#7a4e2e', roughness: 0.9 });
-  const frente = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 });
+  const madera = material({ color: '#7a4e2e', roughness: 0.9 });
+  const frente = material({ map: tex, roughness: 0.85 });
   const cartel = new THREE.Group();
   const tabla = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.52, 0.05), [madera, madera, madera, madera, frente, madera]);
   tabla.position.y = 0.72;
@@ -431,23 +495,45 @@ const rocasFlotantes = [];
 /* ═════════════════════ Las flores ═════════════════════ */
 
 const PALETA = ['#7b2cbf', '#9d4edd', '#c77dff', '#5a189a', '#b185db', '#8e44ad', '#d4a5f5', '#6c3fb5', '#a663cc', '#e0aaff'];
-const TIPOS = ['margarita', 'anemona', 'tulipan', 'lavanda'];
+const TIPOS = ['margarita', 'anemona', 'tulipan', 'lavanda', 'campanilla', 'pensamiento', 'lirio', 'allium', 'rosa', 'jacinto'];
+// Tallo de cada tipo: alto mínimo, cuánto puede variar, cuánto se inclina y grosor
+const TALLO = {
+  margarita: [0.62, 0.5, 0.05, 0.019],
+  anemona: [0.62, 0.5, 0.05, 0.019],
+  tulipan: [0.62, 0.5, 0.05, 0.019],
+  lavanda: [0.7, 0.5, 0.15, 0.012],
+  campanilla: [0.66, 0.36, 0.2, 0.014],
+  pensamiento: [0.3, 0.22, 0.05, 0.015],
+  lirio: [0.72, 0.4, 0.04, 0.02],
+  allium: [0.88, 0.42, 0.04, 0.016],
+  rosa: [0.6, 0.42, 0.05, 0.02],
+  jacinto: [0.42, 0.25, 0.03, 0.025],
+};
+const ABAJO = new V3(0, -1, 0);
 const BRILLO_FLOR = 0.16; // brillo propio de pétalos (para que luzcan al atardecer)
 const BRILLO_VERDE = 0.28;
 
 const GEO = {
-  margarita: new THREE.SphereGeometry(1, 10, 5).translate(1, 0, 0).scale(0.15, 0.022, 0.045),
-  anemona: new THREE.SphereGeometry(1, 12, 6).translate(1, 0, 0).scale(0.13, 0.03, 0.1),
-  tulipan: new THREE.SphereGeometry(1, 10, 6).translate(0, 1, 0).scale(0.04, 0.14, 0.078),
-  flosculo: new THREE.SphereGeometry(0.026, 6, 4).scale(1, 1.35, 1),
-  hoja: new THREE.SphereGeometry(1, 8, 4).translate(1, 0, 0).scale(0.15, 0.012, 0.055),
-  centro: new THREE.SphereGeometry(0.055, 10, 6).scale(1, 0.55, 1),
+  margarita: new THREE.SphereGeometry(1, seg(10, 5), seg(5)).translate(1, 0, 0).scale(0.15, 0.022, 0.045),
+  anemona: new THREE.SphereGeometry(1, seg(12, 6), seg(6)).translate(1, 0, 0).scale(0.13, 0.03, 0.1),
+  tulipan: new THREE.SphereGeometry(1, seg(10, 5), seg(6)).translate(0, 1, 0).scale(0.04, 0.14, 0.078),
+  flosculo: new THREE.SphereGeometry(0.026, seg(6, 4), seg(4, 2)).scale(1, 1.35, 1),
+  // campana que cuelga boca abajo (la punta arriba, en el origen)
+  campana: new THREE.LatheGeometry(
+    [[0.037, -0.076], [0.027, -0.067], [0.022, -0.044], [0.017, -0.02], [0.007, -0.004], [0, 0]].map(([x, y]) => new THREE.Vector2(x, y)),
+    seg(8, 6)
+  ),
+  pensamiento: new THREE.SphereGeometry(1, seg(10, 6), seg(5)).translate(0.85, 0, 0).scale(0.074, 0.015, 0.07),
+  lirio: new THREE.SphereGeometry(1, seg(10, 5), seg(5)).translate(1, 0, 0).scale(0.1, 0.016, 0.052),
+  rosa: new THREE.SphereGeometry(1, seg(10, 6), seg(6, 4)).translate(0, 1, 0).scale(0.02, 0.05, 0.058),
+  hoja: new THREE.SphereGeometry(1, seg(8, 5), seg(4)).translate(1, 0, 0).scale(0.15, 0.012, 0.055),
+  centro: new THREE.SphereGeometry(0.055, seg(10, 6), seg(6, 4)).scale(1, 0.55, 1),
   punto: new THREE.SphereGeometry(0.026, 8, 5),
   toque: new THREE.SphereGeometry(0.42, 8, 6),
   sombra: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
 };
 const conBrillo = (color, intensidad, extra = {}) =>
-  new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: intensidad, ...extra });
+  material({ color, emissive: color, emissiveIntensity: intensidad, ...extra });
 const MAT = {
   tallo: conBrillo('#4a8a40', BRILLO_VERDE, { roughness: 0.8 }),
   hoja: conBrillo('#56a04a', BRILLO_VERDE, { roughness: 0.75, side: THREE.DoubleSide }),
@@ -456,6 +542,19 @@ const MAT = {
   invisible: new THREE.MeshBasicMaterial({ visible: false }),
   sombra: new THREE.MeshBasicMaterial({ map: TEX_SOMBRA, transparent: true, depthWrite: false, opacity: 0.75 }),
 };
+
+// Flores especiales: la de cada mes juntos, la de cada año y la de cada 100 días
+function hito(i) {
+  if (i <= 0) return '';
+  const f = masDias(INICIO, i);
+  if (f.getDate() === INICIO.getDate()) {
+    const meses = (f.getFullYear() - INICIO.getFullYear()) * 12 + f.getMonth() - INICIO.getMonth();
+    if (meses > 0 && meses % 12 === 0) return `¡${meses / 12} ${plural(meses / 12, 'año', 'años')} juntos! 🎉`;
+    if (meses > 0) return `¡${meses} ${plural(meses, 'mes', 'meses')} juntos! 💜`;
+  }
+  if ((i + 1) % 100 === 0) return `¡${i + 1} días juntos! ✨`;
+  return '';
+}
 
 function posicionFlor(i) {
   const r = azar(5000 + i * 31);
@@ -469,27 +568,38 @@ function crearFlor(i) {
   const tipo = i === 0 ? 'margarita' : TIPOS[Math.floor(r() * TIPOS.length)];
   const color = new THREE.Color(PALETA[Math.floor(r() * PALETA.length)]);
   color.offsetHSL((r() - 0.5) * 0.03, (r() - 0.5) * 0.1, (r() - 0.5) * 0.06);
+  const especial = hito(i);
+  if (especial) color.set('#f4e6ff'); // las flores especiales son casi blancas
   const matPetalo = conBrillo(color, BRILLO_FLOR, { roughness: 0.5, side: THREE.DoubleSide });
 
   const grupo = new THREE.Group();
   grupo.position.copy(posicionFlor(i));
   grupo.rotation.y = r() * Math.PI * 2;
 
+  const [altoMin, altoVar, curvaMin, grosor] = TALLO[tipo];
   const nTallos = tipo === 'lavanda' ? 3 : 1;
   const tallos = [];
   for (let k = 0; k < nTallos; k++) {
-    const alto = (tipo === 'lavanda' ? 0.7 : 0.62) + r() * 0.5 - k * 0.08;
+    const alto = altoMin + r() * altoVar - k * 0.08;
     const ang = nTallos > 1 ? (k / nTallos) * Math.PI * 2 + r() * 0.8 : r() * Math.PI * 2;
-    const curva = (nTallos > 1 ? 0.15 : 0.05) + r() * 0.08;
+    const curva = curvaMin + r() * 0.08;
     const dx = Math.cos(ang) * curva, dz = Math.sin(ang) * curva;
-    const camino = new THREE.CatmullRomCurve3([new V3(0, 0, 0), new V3(dx * 0.25, alto * 0.5, dz * 0.25), new V3(dx, alto, dz)]);
-    const tallo = new THREE.Mesh(new THREE.TubeGeometry(camino, 8, tipo === 'lavanda' ? 0.012 : 0.019, 5), MAT.tallo);
+    const camino = tipo === 'campanilla'
+      ? new THREE.CatmullRomCurve3([ // el tallo se arquea por arriba y las campanas cuelgan de él
+        new V3(0, 0, 0), new V3(dx * 0.1, alto * 0.5, dz * 0.1), new V3(dx * 0.55, alto * 0.9, dz * 0.55), new V3(dx * 1.3, alto * 0.97, dz * 1.3),
+      ])
+      : new THREE.CatmullRomCurve3([new V3(0, 0, 0), new V3(dx * 0.25, alto * 0.5, dz * 0.25), new V3(dx, alto, dz)]);
+    const tallo = new THREE.Mesh(
+      new THREE.TubeGeometry(camino, tipo === 'campanilla' ? seg(12, 7) : seg(8, 5), grosor, Q.detalle < 1 ? 4 : 5),
+      MAT.tallo
+    );
     grupo.add(tallo);
 
     const punta = camino.getPoint(1);
     const cabeza = new THREE.Group();
     cabeza.quaternion.setFromUnitVectors(ARRIBA, camino.getTangent(1).normalize());
     if (tipo === 'margarita' || tipo === 'anemona') cabeza.rotateX((r() - 0.5) * 0.45);
+    else if (tipo === 'pensamiento') cabeza.rotateX(0.7 + r() * 0.35); // mira de lado, no al cielo
     grupo.add(cabeza);
 
     const petalos = [];
@@ -517,6 +627,81 @@ function crearFlor(i) {
     } else if (tipo === 'tulipan') {
       anillo(GEO.tulipan, 3, 0.1, -0.34, 0, 0.042);
       anillo(GEO.tulipan, 3, 0.1, -0.16, Math.PI / 3, 0.03, 0.93);
+    } else if (tipo === 'rosa') {
+      // tres vueltas de pétalos: un capullo apretado dentro y cada vuelta más abierta
+      anillo(GEO.rosa, 3, 0.12, 0.02, 0, 0.011, 0.75);
+      anillo(GEO.rosa, 5, 0.15, () => -0.4 - r() * 0.08, 0.5, 0.027, 0.95);
+      anillo(GEO.rosa, 6, 0.15, () => -0.8 - r() * 0.12, 1.1, 0.04, 1.12);
+    } else if (tipo === 'lirio') {
+      // tres pétalos que caen (con su mancha amarilla) y tres que se quedan de pie
+      anillo(GEO.lirio, 3, 1.3, () => -0.5 - r() * 0.2, 0, 0.012);
+      for (const p of petalos) {
+        const marca = new THREE.Mesh(GEO.punto, MAT.centroDorado);
+        marca.scale.set(1.5, 0.4, 0.75);
+        marca.position.set(0.062, 0.011, 0);
+        p.m.add(marca);
+      }
+      anillo(GEO.tulipan, 3, 0.04, -0.13, Math.PI / 3, 0.016, 0.82);
+    } else if (tipo === 'pensamiento') {
+      // cinco pétalos redondos: los dos de arriba más oscuros y el de abajo más grande
+      const oscuro = conBrillo(color.clone().offsetHSL(0, 0.04, -0.14), BRILLO_FLOR, { roughness: 0.5, side: THREE.DoubleSide });
+      for (let p = 0; p < 5; p++) {
+        const eje = new THREE.Group();
+        eje.rotation.y = -Math.PI / 2 + (p / 5) * Math.PI * 2 + (r() - 0.5) * 0.08;
+        const alta = p === 2 || p === 3;
+        const m = new THREE.Mesh(GEO.pensamiento, alta ? oscuro : matPetalo);
+        m.scale.setScalar(p === 0 ? 1.15 : alta ? 1.02 : 0.9);
+        eje.add(m);
+        cabeza.add(eje);
+        petalos.push({ m, cerrado: 1.3, abierto: 0.1 + r() * 0.1 });
+      }
+      const centro = new THREE.Mesh(GEO.punto, MAT.centroDorado);
+      centro.scale.set(0.9, 0.5, 0.9);
+      centro.position.y = 0.008;
+      cabeza.add(centro);
+    } else if (tipo === 'campanilla') {
+      // campanas que cuelgan del arco del tallo, a un lado y a otro
+      const n = 5;
+      const qInv = cabeza.quaternion.clone().invert();
+      const hacia = new V3(dx, 0, dz).normalize();
+      const lateral = new V3(-hacia.z, 0, hacia.x);
+      for (let j = 0; j < n; j++) {
+        const m = new THREE.Mesh(GEO.campana, matPetalo);
+        m.position.copy(camino.getPoint(0.52 + j * 0.115)).sub(punta).applyQuaternion(qInv);
+        const cae = new V3(0, -1, 0).addScaledVector(hacia, 0.35).addScaledVector(lateral, j % 2 ? 0.4 : -0.4).normalize();
+        m.quaternion.setFromUnitVectors(ABAJO, cae).premultiply(qInv);
+        cabeza.add(m);
+        petalos.push({ m, escala: j / n, base: 1 - j * 0.08 });
+      }
+    } else if (tipo === 'allium') {
+      // una bola de florecitas en lo alto de un tallo largo
+      const n = Q.detalle < 1 ? 22 : 30;
+      const nucleo = new THREE.Mesh(GEO.punto, matPetalo);
+      nucleo.scale.setScalar(2.7);
+      nucleo.position.y = 0.085;
+      cabeza.add(nucleo);
+      for (let j = 0; j < n; j++) {
+        const y = 1 - (2 * (j + 0.5)) / n, rad = Math.sqrt(1 - y * y), a = j * 2.39996;
+        const m = new THREE.Mesh(GEO.flosculo, matPetalo);
+        m.position.set(Math.cos(a) * rad * 0.088, 0.085 + y * 0.088, Math.sin(a) * rad * 0.088);
+        cabeza.add(m);
+        petalos.push({ m, escala: (1 - y) / 2, base: 1.45 });
+      }
+    } else if (tipo === 'jacinto') {
+      // una espiga gorda y apretada
+      const n = 20;
+      const nucleo = new THREE.Mesh(GEO.punto, matPetalo);
+      nucleo.scale.set(1.25, 5.4, 1.25);
+      nucleo.position.y = 0.15;
+      cabeza.add(nucleo);
+      for (let j = 0; j < n; j++) {
+        const a = j * 2.39996;
+        const rr = 0.046 * (1 - Math.pow(j / n, 2) * 0.55);
+        const m = new THREE.Mesh(GEO.flosculo, matPetalo);
+        m.position.set(Math.cos(a) * rr, 0.015 + j * 0.0135, Math.sin(a) * rr);
+        cabeza.add(m);
+        petalos.push({ m, escala: j / n, base: 1.6 });
+      }
     } else {
       const n = 16;
       for (let j = 0; j < n; j++) {
@@ -552,7 +737,7 @@ function crearFlor(i) {
 
   grupo.updateMatrixWorld(true);
   const flor = {
-    i, tipo, grupo, tallos, sombra, toque, color, g: 0, anim: null, fase: r() * 6.28,
+    i, tipo, grupo, tallos, sombra, toque, color, hito: especial, g: 0, anim: null, fase: r() * 6.28,
     punta: grupo.localToWorld(tallos[0].punta.clone()),
   };
   crecer(flor, 0);
@@ -572,7 +757,7 @@ function crecer(flor, g) {
     t.cabeza.position.copy(t.punta).multiplyScalar(sg);
     t.cabeza.scale.setScalar(Math.max(0.001, 0.4 + 0.6 * (sc < 1 ? rebote(sc) : 1)) * Math.min(1, g * 6));
     for (const p of t.petalos) {
-      if (p.escala !== undefined) p.m.scale.setScalar(0.35 + 0.65 * rebote(clamp01(ab * 1.6 - p.escala * 0.6)));
+      if (p.escala !== undefined) p.m.scale.setScalar((p.base || 1) * (0.35 + 0.65 * rebote(clamp01(ab * 1.6 - p.escala * 0.6))));
       else p.m.rotation.z = lerp(p.cerrado, p.abierto, ab);
     }
     for (const h of t.hojas) h.scale.setScalar(Math.max(0.001, salida(clamp01((g - 0.12) / 0.4))));
@@ -589,7 +774,7 @@ function crecer(flor, g) {
    verde) que se mecen con la brisa directamente en la tarjeta gráfica. */
 
 function materialFundido(roughness, brillo) {
-  const m = new THREE.MeshStandardMaterial({
+  const m = material({
     vertexColors: true, roughness, side: THREE.DoubleSide, emissive: '#ffffff', emissiveIntensity: brillo,
   });
   m.onBeforeCompile = (sh) => {
@@ -708,6 +893,19 @@ if (IDX_HOY >= 0) {
   brilloHoy = { f, halo, luz };
 }
 
+/* ---------- Destello sobre las flores especiales ---------- */
+const destellos = [];
+for (const f of flores) {
+  if (!f.hito || f.estado !== 'abierta' || f === brilloHoy?.f) continue;
+  const d = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: TEX_HALO, color: '#ffe9ff', blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.4 })
+  );
+  d.position.copy(f.punta);
+  d.userData.fase = f.i * 1.7;
+  escena.add(d);
+  destellos.push(d);
+}
+
 /* ---------- Luciérnagas, pétalos que caen y chispas ---------- */
 const luciernagas = (() => {
   const r = azar(31);
@@ -732,7 +930,7 @@ const petalosCaen = (() => {
   const r = azar(55);
   const n = MOVIMIENTO_REDUCIDO ? 0 : Math.round(16 + RADIO * 3);
   const geo = new THREE.SphereGeometry(1, 6, 4).scale(0.05, 0.008, 0.032);
-  const mat = new THREE.MeshStandardMaterial({ color: '#c99bf0', emissive: '#7b3fb0', emissiveIntensity: 0.3, roughness: 0.6 });
+  const mat = material({ color: '#c99bf0', emissive: '#7b3fb0', emissiveIntensity: 0.3, roughness: 0.6 });
   const malla = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
   malla.count = n;
   malla.frustumCulled = false;
@@ -788,265 +986,171 @@ const chispas = (() => {
   };
 })();
 
-/* ═════════════════════ Chiikawa, Hachiware y Usagi ═════════════════════
-   Van en fila dando saltitos por el borde del jardín, con estilo de dibujo
-   animado (contorno y sombreado plano). Parpadean, y si los tocas pegan un
-   salto grande con cara de felicidad. */
-
-const personajes = [];
-const toquesPersonajes = [];
-const PASEO = RADIO - 0.95; // anillo libre entre las flores y los arbustos
-{
-  // Sombreado plano de 3 tonos, como en un dibujo
-  const tonos = new THREE.DataTexture(new Uint8Array([120, 120, 120, 255, 200, 200, 200, 255, 255, 255, 255, 255]), 3, 1);
-  tonos.minFilter = tonos.magFilter = THREE.NearestFilter;
-  tonos.needsUpdate = true;
-  const toon = (color, brillo = 0.38) => new THREE.MeshToonMaterial({ color, gradientMap: tonos, emissive: color, emissiveIntensity: brillo });
-  const LINEA = new THREE.MeshBasicMaterial({ color: '#3b2c3d', side: THREE.BackSide });
-  const GROSOR = 0.0065;
-
-  // Cuerpo en forma de pera (torneado)
-  const perfil = [[0, -0.125], [0.07, -0.122], [0.118, -0.098], [0.134, -0.045], [0.13, 0.02], [0.112, 0.075], [0.08, 0.115], [0, 0.13]]
-    .map(([x, y]) => new THREE.Vector2(x, y));
-  const curvaPerfil = new THREE.SplineCurve(perfil);
-  const G = {
-    cuerpo: new THREE.LatheGeometry(curvaPerfil.getPoints(24), 32),
-    cabeza: new THREE.SphereGeometry(0.19, 36, 24),
-    cara: new THREE.SphereGeometry(0.19 * 1.006, 40, 20, Math.PI / 2 - 0.9, 1.8, Math.PI / 2 - 0.55, 1.1),
-    brazo: new THREE.CapsuleGeometry(0.036, 0.055, 6, 14),
-    pie: new THREE.SphereGeometry(0.05, 16, 10),
-    orejaRedonda: new THREE.SphereGeometry(0.058, 20, 14),
-    orejaGato: new THREE.ConeGeometry(0.07, 0.13, 24, 1),
-    orejaConejo: new THREE.CapsuleGeometry(0.041, 0.21, 8, 16),
-    cola: new THREE.SphereGeometry(0.04, 14, 10),
-    // Gorro azul de Hachiware: casquete con la «V» blanca en la frente
-    gorro: new THREE.SphereGeometry(0.192, 40, 16, Math.PI / 2 + 0.36, Math.PI * 2 - 0.72, 0, 1.18),
-  };
-  for (const g of Object.values(G)) g.computeBoundingSphere();
-
-  // Cara dibujada en un lienzo y pegada a la cabeza
-  function dibujarCara(tipo, gesto) {
-    const c = document.createElement('canvas');
-    c.width = 512;
-    c.height = 256;
-    const g = c.getContext('2d');
-    g.lineCap = g.lineJoin = 'round';
-    const tinta = '#1f1622';
-    const elipse = (x, y, rx, ry) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill(); };
-    const ojoY = 110;
-    const ojos = [168, 344];
-
-    // Mejillas con rayitas
-    for (const x of [112, 400]) {
-      g.fillStyle = 'rgba(255, 145, 178, 0.9)';
-      elipse(x, 150, 36, 15);
-      g.strokeStyle = 'rgba(226, 84, 128, 0.85)';
-      g.lineWidth = 3.5;
-      for (const k of [-1, 0, 1]) {
-        g.beginPath();
-        g.moveTo(x + k * 15 - 6, 158);
-        g.lineTo(x + k * 15 + 6, 142);
-        g.stroke();
-      }
-    }
-
-    // Ojos
-    g.fillStyle = g.strokeStyle = tinta;
-    for (const x of ojos) {
-      if (gesto === 'parpadeo') {
-        g.lineWidth = 6;
-        g.beginPath();
-        g.moveTo(x - 15, ojoY + 2);
-        g.quadraticCurveTo(x, ojoY + 9, x + 15, ojoY + 2);
-        g.stroke();
-      } else if (gesto === 'feliz') {
-        g.lineWidth = 7;
-        g.beginPath();
-        g.moveTo(x - 16, ojoY + 8);
-        g.quadraticCurveTo(x, ojoY - 16, x + 16, ojoY + 8);
-        g.stroke();
-      } else {
-        g.fillStyle = tinta;
-        elipse(x, ojoY, 14.5, 19);
-        g.fillStyle = '#ffffff';
-        elipse(x - 4, ojoY - 7, 6, 6.5);
-        elipse(x + 5, ojoY + 7, 2.6, 2.6);
-      }
-    }
-
-    // Boca
-    g.fillStyle = g.strokeStyle = tinta;
-    g.lineWidth = 4.5;
-    const bocaAbierta = (ancho, alto, y = 140) => {
-      g.fillStyle = '#5b1f2e';
-      g.beginPath();
-      g.moveTo(256 - ancho, y);
-      g.quadraticCurveTo(256, y - 4, 256 + ancho, y);
-      g.quadraticCurveTo(256 + ancho * 0.9, y + alto, 256, y + alto);
-      g.quadraticCurveTo(256 - ancho * 0.9, y + alto, 256 - ancho, y);
-      g.fill();
-      g.fillStyle = '#ff8fa8';
-      elipse(256, y + alto * 0.72, ancho * 0.55, alto * 0.25);
-    };
-    if (tipo === 'usagi') {
-      bocaAbierta(gesto === 'feliz' ? 26 : 20, gesto === 'feliz' ? 34 : 26);
-    } else if (gesto === 'feliz') {
-      bocaAbierta(16, 22);
-    } else if (tipo === 'hachiware') {
-      g.beginPath(); // boca de gato «ω»
-      g.moveTo(236, 140);
-      g.quadraticCurveTo(246, 154, 256, 142);
-      g.quadraticCurveTo(266, 154, 276, 140);
-      g.stroke();
-    } else {
-      g.beginPath();
-      g.moveTo(245, 145);
-      g.quadraticCurveTo(256, 153, 267, 145);
-      g.stroke();
-    }
-
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    return tex;
-  }
-
-  const DATOS = [
-    { tipo: 'usagi', piel: '#f9e8a6', periodo: 0.42, altura: 0.27 }, // la más alocada, va delante
-    { tipo: 'chiikawa', piel: '#fffaf4', periodo: 0.56, altura: 0.16 },
-    { tipo: 'hachiware', piel: '#fffaf4', periodo: 0.6, altura: 0.19 },
-  ];
-
-  DATOS.forEach((d, k) => {
-    const mPiel = toon(d.piel);
-    const raiz = new THREE.Group(); // posición en el paseo
-    const cuerpo = new THREE.Group(); // salto y aplastamiento
-    raiz.add(cuerpo);
-
-    // Cada pieza lleva su contorno (una copia un poco más grande, del revés)
-    const pieza = (geo, m, padre, x, y, z, sx = 1, sy = 1, sz = 1, contorno = true) => {
-      const o = new THREE.Mesh(geo, m);
-      o.position.set(x, y, z);
-      o.scale.set(sx, sy, sz);
-      padre.add(o);
-      if (contorno) {
-        const l = new THREE.Mesh(geo, LINEA);
-        l.scale.setScalar(1 + GROSOR / (geo.boundingSphere.radius * Math.min(sx, sy, sz)));
-        o.add(l);
-      }
-      return o;
-    };
-
-    pieza(G.cuerpo, mPiel, cuerpo, 0, 0.15, 0, 1, 1, 0.94);
-    pieza(G.cabeza, mPiel, cuerpo, 0, 0.37, 0, 1.12, 0.94, 1);
-    for (const s of [-1, 1]) pieza(G.pie, mPiel, cuerpo, s * 0.064, 0.034, 0.03, 1, 0.62, 1.3);
-    const brazos = [-1, 1].map((s) => pieza(G.brazo, mPiel, cuerpo, s * 0.122, 0.2, 0.035));
-
-    // Cara (normal, parpadeo y feliz)
-    const caras = { normal: dibujarCara(d.tipo, 'normal'), parpadeo: dibujarCara(d.tipo, 'parpadeo'), feliz: dibujarCara(d.tipo, 'feliz') };
-    const matCara = new THREE.MeshBasicMaterial({ map: caras.normal, transparent: true, depthWrite: false });
-    pieza(G.cara, matCara, cuerpo, 0, 0.37, 0, 1.12, 0.94, 1, false);
-
-    const orejas = [];
-    if (d.tipo === 'chiikawa') {
-      for (const s of [-1, 1]) {
-        const o = pieza(G.orejaRedonda, mPiel, cuerpo, s * 0.118, 0.515, -0.01, 1, 0.86, 0.62);
-        o.rotation.z = -s * 0.38;
-      }
-      pieza(G.cola, mPiel, cuerpo, 0, 0.1, -0.125);
-    } else if (d.tipo === 'hachiware') {
-      const azul = toon('#5c72a8', 0.3);
-      pieza(G.gorro, azul, cuerpo, 0, 0.37, 0, 1.12, 0.94, 1, false);
-      for (const s of [-1, 1]) {
-        const o = pieza(G.orejaGato, azul, cuerpo, s * 0.112, 0.54, -0.01, 1, 1, 0.55);
-        o.rotation.z = -s * 0.42;
-      }
-      pieza(G.cola, azul, cuerpo, 0, 0.1, -0.125, 1, 1, 1.25);
-    } else {
-      for (const s of [-1, 1]) {
-        const base = new THREE.Group(); // las orejas rebotan desde su base
-        base.position.set(s * 0.068, 0.5, -0.02);
-        base.rotation.z = -s * 0.13;
-        cuerpo.add(base);
-        pieza(G.orejaConejo, mPiel, base, 0, 0.13, 0, 1, 1, 0.62);
-        orejas.push(base);
-      }
-      pieza(G.cola, mPiel, cuerpo, 0, 0.1, -0.125);
-    }
-
-    const sombra = new THREE.Mesh(GEO.sombra, MAT.sombra);
-    sombra.position.y = 0.014;
-    raiz.add(sombra);
-
-    const toque = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6), MAT.invisible);
-    toque.position.y = 0.32;
-    toque.userData.personaje = k;
-    cuerpo.add(toque);
-    toquesPersonajes.push(toque);
-
-    escena.add(raiz);
-    personajes.push({
-      ...d, raiz, cuerpo, brazos, orejas, sombra, caras, matCara,
-      ang0: Math.PI / 2 - 0.35 - k * (0.6 / PASEO), // salen por delante, en fila
-      desfase: k * 0.17,
-      salto: -10,
-      parpadeo: 1.5 + k * 1.3,
+/* ---------- Mariposas que revolotean entre las flores ---------- */
+const mariposas = (() => {
+  const n = MOVIMIENTO_REDUCIDO ? 0 : Q.mariposas;
+  const r = azar(808);
+  const ala = new THREE.Shape();
+  ala.moveTo(0, 0);
+  ala.bezierCurveTo(0.02, 0.075, 0.095, 0.085, 0.088, 0.022);
+  ala.bezierCurveTo(0.084, -0.008, 0.052, -0.014, 0.034, -0.01);
+  ala.bezierCurveTo(0.062, -0.03, 0.042, -0.064, 0.014, -0.046);
+  ala.bezierCurveTo(0.004, -0.03, 0, -0.012, 0, 0);
+  const geo = new THREE.ShapeGeometry(ala, 5).rotateX(Math.PI / 2); // tumbada: vuela hacia +z
+  const tonos = ['#ecd6ff', '#ffc6e8', '#ffffff', '#cfa8ff', '#ffe9a8', '#b9d8ff'];
+  const lista = [];
+  for (let i = 0; i < n; i++) {
+    const grupo = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: tonos[i % tonos.length], side: THREE.DoubleSide });
+    const alas = [1, -1].map((lado) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.scale.x = lado;
+      grupo.add(m);
+      return m;
     });
-  });
-}
-
-function moverPersonajes(t) {
-  const giro = 0.1; // rad/s: una vuelta al jardín cada minuto
-  for (const p of personajes) {
-    const a = p.ang0 + giro * t;
-    p.raiz.position.set(Math.cos(a) * PASEO, 0, Math.sin(a) * PASEO);
-    p.raiz.rotation.y = -a + 1.05; // avanzan de lado, mirando hacia fuera (hacia quien mira el jardín)
-
-    const fase = ((t + p.desfase) / p.periodo) % 1;
-    const arco = Math.sin(fase * Math.PI);
-    let h = arco * p.altura;
-    const suelo = 1 - Math.min(1, arco * 3); // 1 al tocar el suelo
-    let subida = Math.cos(fase * Math.PI); // >0 subiendo, <0 bajando
-
-    // Salto grande al tocarlos (con vuelta en el aire)
-    const s = (t - p.salto) / 1.1;
-    const saltando = s >= 0 && s < 1;
-    if (saltando) {
-      h += Math.sin(s * Math.PI) * 0.65;
-      subida += Math.cos(s * Math.PI) * 2;
-      p.cuerpo.rotation.y = suave(s) * Math.PI * 2;
-    } else p.cuerpo.rotation.y = 0;
-
-    p.cuerpo.position.y = h;
-    const sy = 1 - 0.16 * suelo + 0.06 * (1 - suelo);
-    const sxz = 1 + 0.1 * suelo - 0.03 * (1 - suelo);
-    p.cuerpo.scale.set(sxz, sy, sxz);
-    p.cuerpo.rotation.z = Math.sin(fase * Math.PI * 2) * 0.05;
-
-    const ola = 0.55 + Math.sin(fase * Math.PI * 2) * 0.35 + (saltando ? 1.3 : 0);
-    p.brazos[0].rotation.z = -ola;
-    p.brazos[1].rotation.z = ola;
-    for (const o of p.orejas) o.rotation.x = THREE.MathUtils.clamp(-subida * 0.3, -0.5, 0.6); // orejas de Usagi
-    p.sombra.scale.setScalar(Math.max(0.15, 0.5 - h * 0.45));
-
-    // Caras: feliz al saltar, y parpadeo de vez en cuando
-    let cara = 'normal';
-    if (saltando || (t - p.salto) < 1.6) cara = 'feliz';
-    else if (t > p.parpadeo) {
-      cara = 'parpadeo';
-      if (t > p.parpadeo + 0.13) p.parpadeo = t + 2 + Math.random() * 3.5;
-    }
-    if (p.matCara.map !== p.caras[cara]) p.matCara.map = p.caras[cara];
+    const a = r() * Math.PI * 2, rr = Math.sqrt(r()) * RADIO * 0.6;
+    escena.add(grupo);
+    lista.push({
+      grupo, alas, cx: Math.cos(a) * rr, cz: Math.sin(a) * rr, rx: 0.9 + r() * 1.5, rz: 0.9 + r() * 1.5,
+      y: 0.95 + r() * 0.55, v: 0.22 + r() * 0.2, f: r() * 6.28, f2: r() * 6.28,
+    });
   }
+  const sitio = (m, t, o) => o.set(
+    m.cx + Math.sin(t * m.v + m.f) * m.rx,
+    m.y + Math.sin(t * m.v * 2.3 + m.f2) * 0.22 + Math.sin(t * 9 + m.f) * 0.012,
+    m.cz + Math.sin(t * m.v * 1.31 + m.f2) * m.rz
+  );
+  const delante = new V3();
+  return {
+    actualizar(t) {
+      for (const m of lista) {
+        sitio(m, t, m.grupo.position);
+        m.grupo.lookAt(sitio(m, t + 0.25, delante));
+        const aleteo = 0.2 + (Math.sin(t * 17 + m.f) * 0.5 + 0.5) * 1.15;
+        m.alas[0].rotation.z = aleteo;
+        m.alas[1].rotation.z = -aleteo;
+      }
+    },
+  };
+})();
+
+/* ---------- Estrellas fugaces ---------- */
+const fugaz = (() => {
+  if (MOVIMIENTO_REDUCIDO) return { actualizar() {} };
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 16;
+  const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 128, 0);
+  gr.addColorStop(0, 'rgba(255,255,255,0)');
+  gr.addColorStop(0.9, 'rgba(255,255,255,1)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr;
+  for (let k = 0; k < 7; k++) { // más intensa en el centro
+    g.globalAlpha = 0.28;
+    g.fillRect(0, k, 128, 16 - k * 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const malla = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: tex, color: '#fff4ff', transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, opacity: 0 })
+  );
+  malla.scale.set(24, 0.8, 1);
+  malla.visible = false;
+  malla.renderOrder = -5;
+  escena.add(malla);
+  const desde = new V3(), hacia = new V3(), lado = new V3(), eje = new V3(), base = new THREE.Matrix4();
+  let t0 = 0, siguiente = 5 + Math.random() * 6;
+  const DUR = 0.95;
+  return {
+    actualizar(t) {
+      if (!malla.visible) {
+        if (t < siguiente) return;
+        const az = Math.random() * Math.PI * 2, el = 0.35 + Math.random() * 0.5;
+        desde.set(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el));
+        lado.crossVectors(desde, ARRIBA).normalize().multiplyScalar(Math.random() < 0.5 ? 1 : -1);
+        eje.crossVectors(desde, lado).normalize(); // hacia abajo o hacia arriba, sobre el cielo
+        if (eje.y > 0) eje.negate();
+        hacia.copy(lado).multiplyScalar(0.85).addScaledVector(eje, 0.3 + Math.random() * 0.35).normalize();
+        eje.crossVectors(desde, hacia).normalize();
+        base.makeBasis(hacia, eje, desde);
+        malla.quaternion.setFromRotationMatrix(base);
+        desde.multiplyScalar(150);
+        t0 = t;
+        malla.visible = true;
+      }
+      const p = (t - t0) / DUR;
+      if (p >= 1) {
+        malla.visible = false;
+        siguiente = t + 7 + Math.random() * 13;
+        return;
+      }
+      malla.position.copy(desde).addScaledVector(hacia, p * 70);
+      malla.material.opacity = Math.sin(p * Math.PI) * 0.95;
+    },
+  };
+})();
+
+/* ═════════════════════ Chiikawa, Hachiware y Usagi ═════════════════════
+   Están de pícnic en una manta al borde del jardín (ver personajes.js).
+   Si los tocas, dan dos saltitos, dicen algo y la cámara se acerca. */
+
+const amigos = crearPersonajes({ geoSombra: GEO.sombra, matSombra: MAT.sombra, anchoCara: Q.caras });
+amigos.grupo.position.set(SITIO.x, 0, SITIO.z);
+amigos.grupo.rotation.y = Math.PI / 2 - SITIO.a; // mirando hacia fuera de la isla
+escena.add(amigos.grupo);
+amigos.grupo.updateMatrixWorld(true);
+for (const tex of amigos.texturas) renderer.initTexture(tex); // así no hay tirón la primera vez que cambian de cara
+const toquesPersonajes = amigos.toques;
+const FRENTE_AMIGOS = new V3(SITIO.ca, 0, SITIO.sa);
+
+const burbuja = { el: $('burbuja'), de: -1, fin: 0, medio: 60, pos: new V3() };
+function decir(k) {
+  const p = amigos.lista[k];
+  p.frase = ((p.frase ?? -1) + 1 + Math.floor(Math.random() * (p.frases.length - 1))) % p.frases.length;
+  burbuja.el.textContent = p.frases[p.frase];
+  burbuja.el.hidden = false;
+  burbuja.medio = burbuja.el.offsetWidth / 2 + 8;
+  burbuja.el.style.animation = 'none';
+  void burbuja.el.offsetWidth;
+  burbuja.el.style.animation = '';
+  burbuja.de = k;
+  burbuja.fin = performance.now() / 1000 + 2.4;
+}
+function moverBurbuja(t) {
+  if (burbuja.de < 0) return;
+  const p = amigos.lista[burbuja.de];
+  p.raiz.getWorldPosition(burbuja.pos);
+  burbuja.pos.y += p.cima + p.salto.position.y + 0.08;
+  burbuja.pos.project(camara);
+  if (t > burbuja.fin || burbuja.pos.z > 1) {
+    burbuja.de = -1;
+    burbuja.el.hidden = true;
+    return;
+  }
+  const ancho = window.innerWidth;
+  const x = Math.min(Math.max((burbuja.pos.x * 0.5 + 0.5) * ancho, burbuja.medio), ancho - burbuja.medio); // que no se salga de la pantalla
+  const y = Math.max(70, (-burbuja.pos.y * 0.5 + 0.5) * window.innerHeight);
+  burbuja.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
 }
 
-function saltarPersonaje(k) {
-  const p = personajes[k];
+let enfoque = null; // personaje al que se ha acercado la cámara
+function tocarPersonaje(k) {
+  const p = amigos.lista[k];
   const t = performance.now() / 1000;
-  if (t - p.salto < 1.1) return;
-  p.salto = t;
-  chispas.lanzar(p.raiz.position.clone().add(new V3(0, 0.45, 0)), 30, 0.8);
-  musica.efecto('salto');
+  if (amigos.saltar(k, t)) {
+    chispas.lanzar(p.raiz.getWorldPosition(new V3()).add(new V3(0, p.cima * 0.75, 0)), 26, 0.8);
+    musica.efecto('salto');
+    vibrar(12);
+  }
+  decir(k);
+  if (tarjetaAbierta !== null) cerrarTarjeta(false);
+  if (enfoque !== k) {
+    enfoque = k;
+    volarAPersonaje(p);
+  }
+  reanudarGiro = t + 8;
 }
 
 /* ═════════════════════ Cámara ═════════════════════ */
@@ -1059,17 +1163,25 @@ function ajustarCamara() {
   camara.updateProjectionMatrix();
   renderer.setSize(w, h, false);
   controles.maxDistance = RADIO * 3.2 + 8;
+  controles.maxTargetRadius = RADIO + 1; // la vista no se puede ir lejos de la isla
 }
 ajustarCamara();
 
+let reanudarGiro = 0;
+let tocado = false; // ella ya ha movido la cámara
 function vistaGeneral() {
   // Con pocas flores se ve la isla entera; en jardines muy grandes, la zona más florida.
   const rf = Math.min(RADIO + 0.4, Math.max(Math.min(RADIO, 3.6), ESPACIO * Math.sqrt(ABIERTAS + 1) + 1.3));
   const tan = Math.tan(THREE.MathUtils.degToRad(camara.fov / 2));
   const d = Math.max((rf * (vertical() ? 0.8 : 1.05)) / (tan * camara.aspect), (rf * 1.05) / tan, 4.2);
-  const objetivo = new V3(0, 0.45 + rf * 0.28, 0); // la isla abajo, el cielo arriba
+  // la isla abajo, el cielo arriba (con el móvil tumbado, menos cielo: que no la tapen los botones)
+  const objetivo = new V3(0, 0.45 + rf * (window.innerHeight < 480 ? 0.06 : 0.28), 0);
   const dir = camara.position.clone().sub(controles.target).setY(0);
-  if (dir.lengthSq() < 1e-6) dir.set(0.25, 0, 1);
+  if (!tocado || dir.lengthSq() < 1e-6) {
+    // De entrada, el jardín se ve desde donde están Chiikawa y sus amigos (y el cartel a un lado)
+    const az = SITIO.a + (vertical() ? 0.1 : 0.28);
+    dir.set(Math.cos(az), 0, Math.sin(az));
+  }
   dir.normalize();
   const polar = vertical() ? 1.2 : 1.16;
   const pos = objetivo.clone().addScaledVector(dir, d * Math.sin(polar)).add(new V3(0, d * Math.cos(polar), 0));
@@ -1098,20 +1210,33 @@ function volarAFlor(flor, dur) {
   const pos = p.clone().addScaledVector(dir, dist * 0.88).add(new V3(0, dist * 0.42, 0));
   volar(objetivo, pos, dur);
 }
+function volarAPersonaje(p) {
+  const c = p.raiz.getWorldPosition(new V3());
+  const dist = vertical() ? 3.3 : 2.7;
+  const objetivo = c.clone().add(new V3(0, p.cima * 0.6, 0));
+  const pos = objetivo.clone().addScaledVector(FRENTE_AMIGOS, dist * 0.96).add(new V3(0, dist * 0.2, 0));
+  volar(objetivo, pos, 1.5);
+}
 function volverAGeneral(dur = 1.8, bajar = 0) {
   const v = vistaGeneral();
   volar(v.objetivo.clone().add(new V3(0, -bajar, 0)), v.pos, dur);
 }
 
-{
+// Cómo es la vista general (para saber cuándo se ha alejado de ella)
+const GENERAL = { obj: new V3(), d: 10 };
+function medirGeneral() {
   const v = vistaGeneral();
+  GENERAL.obj.copy(v.objetivo);
+  GENERAL.d = v.pos.distanceTo(v.objetivo);
+  return v;
+}
+{
+  const v = medirGeneral();
   controles.target.copy(v.objetivo);
   camara.position.copy(v.pos);
   controles.update();
 }
 
-let reanudarGiro = 0;
-let tocado = false; // ella ya ha movido la cámara
 controles.addEventListener('start', () => {
   vuelo.activo = false;
   controles.autoRotate = false;
@@ -1176,7 +1301,11 @@ function pintarInterfaz() {
     $('btnCancion').href = CONFIG.cancion;
     $('btnCancion').hidden = false;
   }
-  if (DIA_N < 1) $('pista').textContent = 'Toca la semilla · arrastra para girar';
+  $('pista').textContent = DIA_N < 1
+    ? 'Toca la semilla · arrastra para girar'
+    : TACTIL
+      ? 'Toca una flor o a Chiikawa · un dedo gira · dos dedos mueven y acercan'
+      : 'Toca una flor o a Chiikawa · arrastra para girar · rueda para acercarte';
 }
 pintarInterfaz();
 
@@ -1196,6 +1325,7 @@ function abrirTarjeta(i) {
   const flor = flores[i];
   if (!flor) return;
   tarjetaAbierta = i;
+  enfoque = null;
   const fecha = masDias(INICIO, i);
   ui.firma.hidden = true;
   ui.etiqueta.textContent = `Flor nº ${i + 1} · ${fmtFecha.format(fecha)}${i === IDX_HOY ? ' · hoy' : ''}`;
@@ -1206,7 +1336,7 @@ function abrirTarjeta(i) {
     ui.nav.hidden = true;
   } else {
     const msj = MENSAJES.get(i);
-    ui.texto.textContent = msj?.texto
+    ui.texto.textContent = msj?.texto || flor.hito
       || (i === IDX_HOY ? `La flor de hoy: ya llevamos ${i + 1} ${plural(i + 1, 'día', 'días')} juntos 💜` : `Día ${i + 1} juntos 💜`);
     if (msj?.foto) {
       ui.foto.src = msj.foto;
@@ -1225,6 +1355,7 @@ function abrirTarjeta(i) {
 function abrirCarta() {
   if (!CONFIG.bienvenida) return;
   tarjetaAbierta = 'carta';
+  enfoque = null;
   ui.etiqueta.textContent = 'Para ti 💌';
   ui.texto.textContent = String(CONFIG.bienvenida);
   ui.firma.textContent = CONFIG.de ? `— ${CONFIG.de}` : '';
@@ -1239,20 +1370,27 @@ function abrirCarta() {
   chispas.lanzar(new V3(0, 1.6, 0), 90, 1.4);
 }
 
-function cerrarTarjeta() {
+function cerrarTarjeta(volver = true) {
   if (tarjetaAbierta === null) return;
   tarjetaAbierta = null;
   ui.tarjeta.hidden = true;
   ui.acciones.classList.remove('oculto');
+  if (!volver) return;
   volverAGeneral();
   reanudarGiro = performance.now() / 1000 + 2.5;
 }
 
-$('btnCerrar').addEventListener('click', cerrarTarjeta);
+$('btnCerrar').addEventListener('click', () => cerrarTarjeta());
 ui.ant.addEventListener('click', () => typeof tarjetaAbierta === 'number' && abrirTarjeta(tarjetaAbierta - 1));
 ui.sig.addEventListener('click', () => typeof tarjetaAbierta === 'number' && abrirTarjeta(tarjetaAbierta + 1));
 $('btnHoy').addEventListener('click', () => IDX_HOY >= 0 && abrirTarjeta(IDX_HOY));
 $('btnCarta').addEventListener('click', abrirCarta);
+$('btnVista').addEventListener('click', () => {
+  enfoque = null;
+  if (tarjetaAbierta !== null) cerrarTarjeta(false);
+  volverAGeneral();
+  reanudarGiro = performance.now() / 1000 + 2.5;
+});
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') cerrarTarjeta();
   if (typeof tarjetaAbierta === 'number' && flores[tarjetaAbierta]?.estado === 'abierta') {
@@ -1266,20 +1404,27 @@ const rayo = new THREE.Raycaster();
 const puntero = new THREE.Vector2();
 let pulsado = null;
 let entrado = false;
-lienzo.addEventListener('pointerdown', (e) => { pulsado = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+lienzo.addEventListener('pointerdown', (e) => { pulsado = e.isPrimary === false ? null : { x: e.clientX, y: e.clientY, t: performance.now() }; });
+lienzo.addEventListener('pointercancel', () => { pulsado = null; });
 lienzo.addEventListener('pointerup', (e) => {
   if (!pulsado || !entrado) return;
   const mov = Math.hypot(e.clientX - pulsado.x, e.clientY - pulsado.y);
   const dur = performance.now() - pulsado.t;
   pulsado = null;
-  if (mov > 8 || dur > 600) return;
+  if (mov > (e.pointerType === 'touch' ? 14 : 8) || dur > 600) return;
   const rect = lienzo.getBoundingClientRect();
   puntero.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
   rayo.setFromCamera(puntero, camara);
   const hit = rayo.intersectObjects([...toquesPersonajes, ...toques], false)[0];
-  if (hit && hit.object.userData.personaje !== undefined) saltarPersonaje(hit.object.userData.personaje);
-  else if (hit) abrirTarjeta(hit.object.userData.indice);
+  if (hit && hit.object.userData.personaje !== undefined) tocarPersonaje(hit.object.userData.personaje);
+  else if (hit) { vibrar(8); abrirTarjeta(hit.object.userData.indice); }
   else if (tarjetaAbierta !== null) cerrarTarjeta();
+  else if (enfoque !== null) {
+    // tocar fuera: vuelve a verse el jardín entero
+    enfoque = null;
+    volverAGeneral();
+    reanudarGiro = performance.now() / 1000 + 2.5;
+  }
 });
 
 /* ---------- Entrar al jardín ---------- */
@@ -1315,6 +1460,7 @@ function entrar() {
   musica.iniciar();
   pintarBotonMusica();
   $('btnMusica').hidden = false;
+  $('btnVista').hidden = false; // el botón de la isla se queda siempre a la vista
 
   const t = performance.now() / 1000;
   if (NUEVAS.length) {
@@ -1357,10 +1503,41 @@ const estrellas = escena.getObjectByName('estrellas');
 const dinamicas = flores.filter((f) => f.dinamica);
 let primerCuadro = true;
 
+// Si el jardín va lento, baja la resolución (y luego la hierba) hasta que vaya fluido.
+const ritmo = { n: 0, suma: 0, desde: performance.now() / 1000 + 4, previo: 0, ratioPrevio: 0, fin: false };
+function vigilarRitmo(dtReal, t) {
+  if (ritmo.fin || t < ritmo.desde || dtReal > 0.25) return;
+  ritmo.n++;
+  ritmo.suma += dtReal;
+  if (ritmo.n < 80) return;
+  const medio = ritmo.suma / ritmo.n;
+  ritmo.n = ritmo.suma = 0;
+  if (ritmo.previo && medio > ritmo.previo * 0.93) {
+    // Bajar la resolución no ha servido: el límite es otro (p. ej. el modo ahorro de batería). Se deja como estaba.
+    ratio = ritmo.ratioPrevio;
+    renderer.setPixelRatio(ratio);
+    ritmo.fin = true;
+    return;
+  }
+  ritmo.previo = 0;
+  if (medio < 1 / 42) return; // va bien
+  if (ratio > Q.dprMin + 0.01) {
+    ritmo.previo = medio;
+    ritmo.ratioPrevio = ratio;
+    ratio = Math.max(Q.dprMin, ratio - 0.25);
+    renderer.setPixelRatio(ratio);
+  } else if (pasto.count > 2500) {
+    pasto.count = Math.floor(pasto.count * 0.6);
+  } else ritmo.fin = true;
+  ritmo.desde = t + 1;
+}
+
 function bucle() {
-  const dt = Math.min(reloj.getDelta(), 0.05);
+  const dtReal = reloj.getDelta();
+  const dt = Math.min(dtReal, 0.05);
   const t = performance.now() / 1000;
   uTiempo.value = t;
+  vigilarRitmo(dtReal, t);
 
   // Flores que crecen (las demás se mecen en la tarjeta gráfica)
   for (const f of dinamicas) {
@@ -1421,7 +1598,10 @@ function bucle() {
     petalosCaen.malla.instanceMatrix.needsUpdate = true;
   }
 
-  moverPersonajes(t);
+  amigos.actualizar(t, dt, camara);
+  mariposas.actualizar(t);
+  fugaz.actualizar(t);
+  for (const d of destellos) d.scale.setScalar(0.5 + Math.sin(t * 1.8 + d.userData.fase) * 0.09);
   chispas.actualizar(dt);
   for (const m of rocasFlotantes) {
     m.position.y = m.userData.y0 + Math.sin(t * 0.6 + m.userData.fase) * 0.12;
@@ -1437,12 +1617,21 @@ function bucle() {
     if (p >= 1) vuelo.activo = false;
   }
   if (!MOVIMIENTO_REDUCIDO && tarjetaAbierta === null && !vuelo.activo && t > reanudarGiro) controles.autoRotate = true;
+  {
+    // La cámara puede bajar hasta ras de hierba, pero no meterse bajo tierra
+    const tg = controles.target;
+    tg.y = Math.min(Math.max(tg.y, 0.15), GENERAL.obj.y + 1.2);
+    const d = camara.position.distanceTo(tg);
+    controles.maxPolarAngle = Math.min(1.75, Math.acos(THREE.MathUtils.clamp((0.3 - tg.y) / d, -1, 1)));
+  }
   controles.update();
 
   renderer.render(escena, camara);
+  moverBurbuja(t);
 
   if (primerCuadro) {
     primerCuadro = false;
+    window.jardinListo = performance.now() || 1;
     const b = $('btnEntrar');
     b.disabled = false;
     b.textContent = DIA_N < 1 ? 'Ver la semilla 🌱' : 'Entrar al jardín';
@@ -1450,6 +1639,6 @@ function bucle() {
   requestAnimationFrame(bucle);
 }
 
-window.addEventListener('resize', ajustarCamara);
+window.addEventListener('resize', () => { ajustarCamara(); medirGeneral(); });
 requestAnimationFrame(bucle);
-if (params.has('debug')) window.jardin = { renderer, escena, flores, camara, controles, personajes, musica };
+if (params.has('debug')) window.jardin = { THREE, renderer, escena, flores, camara, controles, amigos, musica, calidad: () => ({ NIVEL, ratio }), tocarPersonaje, SITIO };
