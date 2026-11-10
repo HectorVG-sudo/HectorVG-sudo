@@ -1075,6 +1075,50 @@ const mariposas = (() => {
   };
 })();
 
+/* ---------- Besitos: uno por cada día desde el primer beso, flotando sobre el jardín ---------- */
+const besitos = (() => {
+  const n = BESO ? Math.max(0, diasEntre(BESO, HOY)) : 0;
+  if (!n) return { actualizar() {} };
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.font = '48px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('💋', 32, 35);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // Se reparten siempre en el mismo orden: el besito de cada día conserva su sitio
+  const r = azar(1008);
+  const base = [];
+  for (let i = 0; i < n; i++) {
+    base.push({
+      a: r() * Math.PI * 2, rr: 0.25 + Math.sqrt(r()) * 0.75, y: 1.7 + r() * 2.1,
+      v: (0.03 + r() * 0.05) * (r() < 0.5 ? -1 : 1), f: r() * 6.28,
+    });
+  }
+  const pos = new Float32Array(n * 3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const puntos = new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({ map: tex, size: 0.42, transparent: true, alphaTest: 0.05, depthWrite: false })
+  );
+  puntos.frustumCulled = false;
+  escena.add(puntos);
+  const colocar = (t) => {
+    for (let i = 0; i < n; i++) {
+      const b = base[i], a = b.a + t * b.v, rr = b.rr * (RADIO + 0.5);
+      pos[i * 3] = Math.cos(a) * rr;
+      pos[i * 3 + 1] = b.y + Math.sin(t * 0.7 + b.f) * 0.14;
+      pos[i * 3 + 2] = Math.sin(a) * rr;
+    }
+    geo.attributes.position.needsUpdate = true;
+  };
+  colocar(0);
+  return { n, puntos, actualizar(t) { if (!MOVIMIENTO_REDUCIDO) colocar(t); } };
+})();
+
 /* ---------- Estrellas fugaces ---------- */
 const fugaz = (() => {
   if (MOVIMIENTO_REDUCIDO) return { actualizar() {} };
@@ -1697,6 +1741,7 @@ function bucle() {
 
   amigos.actualizar(t, dt, camara);
   mariposas.actualizar(t);
+  besitos.actualizar(t);
   fugaz.actualizar(t);
   for (const d of destellos) d.scale.setScalar(0.5 + Math.sin(t * 1.8 + d.userData.fase) * 0.09);
   chispas.actualizar(dt);

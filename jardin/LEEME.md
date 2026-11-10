@@ -11,6 +11,7 @@ Un jardín en 3D con una flor por cada día juntos. Cada día brota una nueva a 
 - **Flores especiales**: la flor de cada mes juntos, la de cada año y la de cada 100 días sale casi blanca, con un destello, y al tocarla lo dice («¡2 meses juntos! 💜»). Si ese día tiene un mensaje tuyo en `config.js`, sale tu mensaje.
 - **Diez tipos de flor morada**: margarita, anémona, tulipán, lavanda, campanilla, pensamiento, lirio, allium (bola de florecitas), rosa y jacinto. Cada día tiene siempre la misma.
 - **Cámara**: un dedo (o arrastrar) gira y sube o baja la vista, hasta ras de hierba; dos dedos (o botón derecho) la mueven; pellizcar (o la rueda) acerca hacia donde apuntas. El botón 🏝️ de arriba vuelve a ver todo el jardín.
+- **Besitos** 💋 flotando sobre el jardín: uno por cada día desde el primer beso, cada día uno más.
 - **Mariposas** entre las flores y **estrellas fugaces** de vez en cuando.
 - **Música lo-fi tranquila** generada en el propio navegador (`musica.js`), sin archivos de audio. Al tocar a los personajes hablan con grabaciones de la carpeta `voces/`; cada frase del bocadillo va atada a su archivo en la lista `CLIPS` de `musica.js`. Empieza al pulsar «Entrar al jardín» y se puede silenciar con el botón 🎵 de arriba a la derecha. El jardín recuerda la elección.
 

@@ -27,7 +27,8 @@ export default {
   inicio: "2026-09-25",
 
   // El día de vuestro primer beso (año-mes-día). Sale un contador de días
-  // desde entonces. Déjalo en "" para ocultarlo.
+  // desde entonces y flota un besito 💋 por cada uno de esos días.
+  // Déjalo en "" para ocultarlo.
   primerBeso: "2026-08-10",
 
   // Hora a la que brota la flor de cada día y cambian los contadores
