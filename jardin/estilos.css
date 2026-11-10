@@ -75,7 +75,8 @@ button, a { touch-action: manipulation; }
 .contador .sep { opacity: 0.6; }
 .pildora.vista { background: rgba(120, 60, 20, 0.7); font-size: 12px; }
 /* Cuenta atrás de la próxima flor; cuando ya ha brotado se puede tocar para verla */
-#hudProxima { color: var(--suave); }
+#hudProxima, #hudBeso { color: var(--suave); }
+#hudBeso strong { color: var(--tinta); font-weight: 700; }
 #hudProxima strong, #introFalta { color: var(--tinta); font-weight: 700; font-variant-numeric: tabular-nums; }
 #hudProxima.brotada { pointer-events: auto; cursor: pointer; color: var(--tinta); }
 

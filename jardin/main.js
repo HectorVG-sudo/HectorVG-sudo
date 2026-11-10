@@ -64,7 +64,7 @@ const fmtFecha = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' }
 
 // La flor de cada día brota a esta hora (config.js → horaFlor), hora de quien mira.
 // Hasta entonces, en el jardín sigue siendo el día anterior.
-const HORA_FLOR = Math.min(23, Math.max(0, Math.floor(Number(CONFIG.horaFlor ?? 17)) || 0));
+const HORA_FLOR = Math.min(23, Math.max(0, Math.floor(Number(CONFIG.horaFlor ?? 0)) || 0));
 function diaJardin(d) {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() - HORA_FLOR);
   return new Date(x.getFullYear(), x.getMonth(), x.getDate());
@@ -74,6 +74,7 @@ const HOY_REAL = diaJardin(ahora);
 const HOY_CALENDARIO = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
 const INICIO = leerFecha(CONFIG.inicio) || HOY_REAL;
 const REENCUENTRO = leerFecha(CONFIG.reencuentro);
+const BESO = leerFecha(CONFIG.primerBeso);
 
 const params = new URLSearchParams(location.search);
 const diaVista = parseInt(params.get('dia'), 10);
@@ -1366,6 +1367,18 @@ function pintarInterfaz() {
   $('hudFlores').textContent = ABIERTAS;
   $('hudFloresTxt').textContent = plural(ABIERTAS, 'flor', 'flores');
 
+  // Días desde el primer beso (cambia a la misma hora que la flor)
+  if (BESO) {
+    const n = diasEntre(BESO, HOY);
+    if (n >= 0) {
+      const c = $('hudBeso');
+      const num = document.createElement('strong');
+      num.textContent = n;
+      c.append('💋 ', num, ` ${plural(n, 'día', 'días')} desde nuestro primer beso`);
+      c.hidden = false;
+    }
+  }
+
   if (REENCUENTRO) {
     const f = diasEntre(MODO_VISTA ? HOY : HOY_CALENDARIO, REENCUENTRO);
     const c = $('hudCuenta');
@@ -1415,7 +1428,7 @@ function abrirTarjeta(i) {
   if (flor.estado === 'brote') {
     const dif = diasEntre(HOY, fecha);
     const cuando = new Date().getHours() < HORA_FLOR ? 'hoy' : 'mañana';
-    ui.texto.textContent = dif <= 1 ? `Esta flor brota ${cuando} a las ${HORA_FLOR}:00. Vuelve a verla 🌱` : `Esta flor brota dentro de ${dif} días 🌱`;
+    ui.texto.textContent = dif <= 1 ? `Esta flor brota ${HORA_FLOR ? `${cuando} a las ${HORA_FLOR}:00` : 'a medianoche'}. Vuelve a verla 🌱` : `Esta flor brota dentro de ${dif} días 🌱`;
     ui.foto.hidden = true;
     ui.nav.hidden = true;
   } else {

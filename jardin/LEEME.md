@@ -1,6 +1,6 @@
 # 💜 Nuestro jardín de flores moradas
 
-Un jardín en 3D con una flor por cada día juntos. Cada día brota una nueva a las 17:00 (`horaFlor` en `config.js`), y arriba hay una cuenta atrás hasta la siguiente.
+Un jardín en 3D con una flor por cada día juntos. Cada día brota una nueva a medianoche (`horaFlor` en `config.js`), y arriba hay una cuenta atrás hasta la siguiente y un contador de días desde el primer beso (`primerBeso` en `config.js`).
 
 - **La primera vez que entra** ve crecer la flor de hoy y le sale la carta de bienvenida. Después puede releerla con el botón «💌 Tu carta».
 - **Los demás días** solo ve crecer la flor nueva, sin mensajes.

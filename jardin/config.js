@@ -26,8 +26,13 @@ export default {
   // El día que empezasteis (año-mes-día). Ese día brotó la primera flor.
   inicio: "2026-09-25",
 
-  // Hora a la que brota la flor de cada día (de 0 a 23; 17 = las 5 de la tarde).
-  horaFlor: 17,
+  // El día de vuestro primer beso (año-mes-día). Sale un contador de días
+  // desde entonces. Déjalo en "" para ocultarlo.
+  primerBeso: "2026-08-10",
+
+  // Hora a la que brota la flor de cada día y cambian los contadores
+  // (de 0 a 23; 0 = medianoche, 17 = las 5 de la tarde).
+  horaFlor: 0,
 
   // Día en que os volvéis a ver (año-mes-día). Activa una cuenta atrás.
   // Déjalo en "" si aún no hay fecha.
