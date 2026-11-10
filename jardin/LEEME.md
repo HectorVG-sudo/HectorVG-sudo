@@ -1,12 +1,13 @@
 # 💜 Nuestro jardín de flores moradas
 
-Un jardín en 3D con una flor por cada día juntos. Cada día brota una nueva.
+Un jardín en 3D con una flor por cada día juntos. Cada día brota una nueva a las 17:00 (`horaFlor` en `config.js`), y arriba hay una cuenta atrás hasta la siguiente.
 
 - **La primera vez que entra** ve crecer la flor de hoy y le sale la carta de bienvenida. Después puede releerla con el botón «💌 Tu carta».
 - **Los demás días** solo ve crecer la flor nueva, sin mensajes.
 - **En la esquina** hay un contador de días juntos y de flores.
 - Al tocar una flor, sale qué día juntos representa, o un mensaje escondido si le has puesto uno.
 - **Chiikawa, Hachiware y Usagi** están de pícnic en una manta al borde del jardín. Respiran, parpadean, mueven las orejas y la cola, y te siguen con la mirada. Si los tocas, la cámara se acerca, dan dos saltitos con cara de felicidad y dicen algo. Tocando fuera se vuelve a ver el jardín entero. Están modelados a mano en `personajes.js` (sin archivos 3D).
+- **Amigos que van llegando**: cada mes juntos llega un amigo nuevo (Momonga a los 2 meses, Kurimanju a los 3, Rakko a los 4 y Shisa a los 5; se cambia en `amigos` de `config.js`). Ese día la isla da un estirón y saca un saliente nuevo con su mantita redonda. No tienen voz: al tocarlos solo saltan.
 - **Flores especiales**: la flor de cada mes juntos, la de cada año y la de cada 100 días sale casi blanca, con un destello, y al tocarla lo dice («¡2 meses juntos! 💜»). Si ese día tiene un mensaje tuyo en `config.js`, sale tu mensaje.
 - **Diez tipos de flor morada**: margarita, anémona, tulipán, lavanda, campanilla, pensamiento, lirio, allium (bola de florecitas), rosa y jacinto. Cada día tiene siempre la misma.
 - **Cámara**: un dedo (o arrastrar) gira y sube o baja la vista, hasta ras de hierba; dos dedos (o botón derecho) la mueven; pellizcar (o la rueda) acerca hacia donde apuntas. El botón 🏝️ de arriba vuelve a ver todo el jardín.

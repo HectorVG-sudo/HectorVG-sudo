@@ -26,6 +26,9 @@ export default {
   // El día que empezasteis (año-mes-día). Ese día brotó la primera flor.
   inicio: "2026-09-25",
 
+  // Hora a la que brota la flor de cada día (de 0 a 23; 17 = las 5 de la tarde).
+  horaFlor: 17,
+
   // Día en que os volvéis a ver (año-mes-día). Activa una cuenta atrás.
   // Déjalo en "" si aún no hay fecha.
   reencuentro: "",
@@ -37,6 +40,16 @@ export default {
   // (Luego la puede releer con el botón «💌 Tu carta»).
   bienvenida:
     "Hola princesita 💜\nEs el día de las flores moradas, así que te he hecho esto.\n\nEste es nuestro jardín: tiene una flor por cada día que llevamos juntos. Cada día va a nacer una nueva, para que aunque estemos lejos nunca te falten flores mías.",
+
+  // Amigos de Chiikawa que van llegando al jardín: a los cuántos meses
+  // juntos llega cada uno (ese día la isla da un estirón y le hace sitio).
+  // Pon 0 para que uno no venga.
+  amigos: {
+    momonga: 2,
+    kurimanju: 3,
+    rakko: 4,
+    shisa: 5,
+  },
 
   // Opcional: mensajes escondidos en las flores de días concretos.
   // Ella los encuentra al tocar la flor de ese día. Las demás flores

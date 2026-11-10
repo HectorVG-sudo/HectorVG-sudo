@@ -2,6 +2,8 @@
 //  Chiikawa, Hachiware y Usagi, modelados a mano (sin archivos 3D).
 //  Están de pícnic sobre una manta: respiran, parpadean, te siguen
 //  con la mirada y, si los tocas, dan dos saltitos con cara feliz.
+//  Con los meses van llegando Momonga, Kurimanju, Rakko y Shisa,
+//  cada uno a su mantita redonda en un saliente nuevo de la isla.
 // ─────────────────────────────────────────────────────────────
 
 import * as THREE from './lib/three.module.min.js';
@@ -132,12 +134,15 @@ function bordeGorro(lon) {
   return h * CAB.arriba;
 }
 
-function pintarGorro(L, lon0, lon1, color) {
+// Borde del glaseado de Kurimanju: casi recto, con una ondita suave
+const bordeGlaseado = (lon) => (0.5 + 0.035 * Math.sin(lon * GRADO * 4)) * CAB.arriba;
+
+function pintarGorro(L, lon0, lon1, color, borde = bordeGorro) {
   const { g, X, Y, s } = L;
   const trazo = () => {
     g.beginPath();
-    g.moveTo(X(lon0), Y(bordeGorro(lon0)));
-    for (let l = lon0; l <= lon1; l += 0.5) g.lineTo(X(l), Y(bordeGorro(l)));
+    g.moveTo(X(lon0), Y(borde(lon0)));
+    for (let l = lon0; l <= lon1; l += 0.5) g.lineTo(X(l), Y(borde(l)));
   };
   trazo();
   g.lineTo(X(lon1), -9);
@@ -165,7 +170,7 @@ const DATOS = {
     frases: ['¡Yadaaa!'], // cada frase tiene su grabación en voces/ (lista CLIPS de musica.js)
   },
   hachiware: {
-    nombre: 'Hachiware', piel: '#ffffff', azul: '#8dcbe9', patas: 0, hombro: [0.19, 0.205], brazo: 0.62, cima: 0.6, ritmo: 1.7,
+    nombre: 'Hachiware', piel: '#ffffff', azul: '#8dcbe9', gorro: { color: '#8dcbe9', borde: bordeGorro }, patas: 0, hombro: [0.19, 0.205], brazo: 0.62, cima: 0.6, ritmo: 1.7,
     ojos: { lon: 17.5, y: 0.01, r: 0.029 },
     mejilla: { lon: 34, y: -0.038, rx: 0.045, ry: 0.03 },
     boca: { y: -0.037, w: 0.06, h: 0.019, pico: 0.95, labio: -0.099 },
@@ -178,7 +183,49 @@ const DATOS = {
     boca: { y: -0.035, w: 0.062, h: 0.019, pico: 0.55, labio: -0.093 },
     frases: ['¡Yahaaa!', '¡Urá!', '¡Purya!', '¿¡Haaaa!?', '¿Huh?'],
   },
+
+  // Los amigos que van llegando al jardín con los meses (config.js → amigos).
+  // No tienen grabaciones de voz, así que no dicen nada: solo saltan.
+  //   talla = tamaño respecto a Chiikawa · cejas = rayita (alto, largo, inclinación, grosor)
+  //   cojin = color de su mantita redonda
+  momonga: {
+    nombre: 'Momonga', piel: '#ffffff', azul: '#bfe1f0', cojin: '#cfeaf7', talla: 0.88,
+    patas: 0, hombro: [0.19, 0.205], brazo: 0.62, cima: 0.56, ritmo: 2.2,
+    ojos: { lon: 18.5, y: 0.012, r: 0.031 }, pestanas: true,
+    cejas: { alto: 0.079, largo: 0.013, inclina: 0.35, grosor: 1 },
+    mejilla: { lon: 34, y: -0.03, rx: 0.044, ry: 0.028 },
+    boca: { y: -0.035, w: 0.055, h: 0.019, pico: 0.5, labio: -0.07 },
+    frases: [],
+  },
+  kurimanju: {
+    nombre: 'Kurimanju', piel: '#f7e2b3', gorro: { color: '#b06a34', borde: bordeGlaseado }, cojin: '#f6dcae', talla: 1,
+    patas: 0, hombro: [0.19, 0.205], brazo: 0.62, cima: 0.56, ritmo: 1.5,
+    ojos: { lon: 18, y: 0.008, r: 0.026 },
+    cejas: { alto: 0.064, largo: 0.012, inclina: -0.3, grosor: 1 },
+    mejilla: { lon: 33, y: -0.03, rx: 0.044, ry: 0.028 },
+    boca: { y: -0.037, w: 0.056, h: 0.019, pico: 0.3, labio: -0.068 },
+    frases: [],
+  },
+  rakko: {
+    nombre: 'Rakko', piel: '#a98568', parche: { color: '#f3e3cc', y: -0.005, lon: 50, ry: 0.108 }, cojin: '#e3d0bb', talla: 1.12,
+    patas: 0, hombro: [0.19, 0.205], brazo: 0.62, cima: 0.56, ritmo: 1.4,
+    ojos: { lon: 17, y: 0.014, r: 0.027 }, nariz: true, cicatriz: true,
+    cejas: { alto: 0.068, largo: 0.02, inclina: 0.4, grosor: 1.6 },
+    mejilla: { lon: 33, y: -0.03, rx: 0.042, ry: 0.027 },
+    boca: { y: -0.047, w: 0.056, h: 0.019, pico: 0.3, labio: -0.078 },
+    frases: [],
+  },
+  shisa: {
+    nombre: 'Shisa', piel: '#f8cf94', melena: '#e0863a', cojin: '#ffd9a8', talla: 0.95,
+    patas: 0, hombro: [0.19, 0.205], brazo: 0.62, cima: 0.6, ritmo: 2,
+    ojos: { lon: 18, y: 0.012, r: 0.029 }, bocaAbierta: true,
+    cejas: { alto: 0.074, largo: 0.007, inclina: 0, grosor: 1.5 },
+    mejilla: { lon: 34, y: -0.034, rx: 0.045, ry: 0.029 },
+    boca: { y: -0.035, w: 0.06, h: 0.019, pico: 0.55, labio: -0.093 },
+    frases: [],
+  },
 };
+export const AMIGOS_NUEVOS = ['momonga', 'kurimanju', 'rakko', 'shisa']; // en el orden en que llegan
 
 function pintarCara(tipo, gesto, ancho) {
   const d = DATOS[tipo];
@@ -186,7 +233,13 @@ function pintarCara(tipo, gesto, ancho) {
   const { c, g, s, X, Y } = L;
   g.fillStyle = d.piel;
   g.fillRect(0, 0, c.width, c.height);
-  if (tipo === 'hachiware') pintarGorro(L, -CARA.lon - 3, CARA.lon + 3, d.azul);
+  if (d.gorro) pintarGorro(L, -CARA.lon - 3, CARA.lon + 3, d.gorro.color, d.gorro.borde);
+  if (d.parche) { // la cara más clara que el resto del pelo (Rakko)
+    g.fillStyle = d.parche.color;
+    g.beginPath();
+    g.ellipse(X(0), Y(d.parche.y), X(d.parche.lon) - X(0), d.parche.ry * s, 0, 0, Math.PI * 2);
+    g.fill();
+  }
   const TRAZO = Math.max(2, 0.0062 * s);
   const feliz = gesto === 'feliz';
 
@@ -214,7 +267,13 @@ function pintarCara(tipo, gesto, ancho) {
   g.strokeStyle = TINTA;
   for (const lado of [-1, 1]) {
     g.beginPath();
-    if (tipo === 'chiikawa') {
+    if (d.cejas) {
+      // una rayita: inclina > 0 la baja por dentro (serio), < 0 por fuera (tranquilo)
+      const q = d.cejas, cx = X(lado * o.lon), cy = Y(o.y + q.alto), l = q.largo * s;
+      g.lineWidth = TRAZO * q.grosor;
+      g.moveTo(cx - lado * l, cy + l * q.inclina);
+      g.lineTo(cx + lado * l, cy - l * q.inclina);
+    } else if (tipo === 'chiikawa') {
       // cortas, gruesas y caídas hacia fuera
       const cx = X(lado * o.lon), cy = Y(o.y + 0.0815), l = 0.0235 * s;
       g.lineWidth = TRAZO;
@@ -267,6 +326,29 @@ function pintarCara(tipo, gesto, ancho) {
       g.beginPath();
       g.arc(x, y + R * 0.08, R * 0.62, Math.PI * 0.24, Math.PI * 0.76);
       g.stroke();
+      if (d.pestanas) { // dos pestañas hacia fuera (Momonga)
+        g.strokeStyle = TINTA;
+        g.lineWidth = R * 0.2;
+        for (const [a0, largo] of [[-0.95, 0.5], [-0.45, 0.42]]) {
+          const ca = Math.cos(a0) * lado, sa = Math.sin(a0);
+          g.beginPath();
+          g.moveTo(x + ca * R * 0.9, y + sa * R * 0.9);
+          g.lineTo(x + ca * R * (1 + largo), y + sa * R * (1 + largo));
+          g.stroke();
+        }
+      }
+    }
+  }
+
+  if (d.cicatriz) { // una cruz en la frente (Rakko)
+    const cx = X(23), cy = Y(0.128), l = 0.017 * s;
+    g.strokeStyle = TINTA;
+    g.lineWidth = TRAZO * 0.9;
+    for (const k of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(cx - l, cy - l * k);
+      g.lineTo(cx + l, cy + l * k);
+      g.stroke();
     }
   }
 
@@ -308,7 +390,7 @@ function pintarCara(tipo, gesto, ancho) {
     g.restore();
     bordeBolsa(bw, bh);
     fondo = bajo + bh;
-  } else if (tipo === 'usagi') {
+  } else if (tipo === 'usagi' || d.bocaAbierta) {
     const bw = w * (feliz ? 0.62 : 0.5), bh = (feliz ? 0.04 : 0.028) * s;
     bolsa(bw, bh, LENGUA);
     bordeBolsa(bw, bh);
@@ -324,6 +406,12 @@ function pintarCara(tipo, gesto, ancho) {
   g.bezierCurveTo(x - w / 2, y + h, x - w * 0.06, y + h, x, y - h * b.pico);
   g.bezierCurveTo(x + w * 0.06, y + h, x + w / 2, y + h, x + w / 2, y - h * 0.25);
   g.stroke();
+  if (d.nariz) { // naricita negra encima de la boca (Rakko)
+    g.fillStyle = TINTA;
+    g.beginPath();
+    g.ellipse(x, y - 0.019 * s, 0.0125 * s, 0.008 * s, 0, 0, Math.PI * 2);
+    g.fill();
+  }
   // Labio de abajo: una rayita curva
   const yl = Math.max(Y(b.labio), fondo + 0.012 * s), wl = 0.021 * s;
   g.beginPath();
@@ -335,8 +423,11 @@ function pintarCara(tipo, gesto, ancho) {
 
 /* ═════════════════════ Los tres amigos ═════════════════════ */
 
-export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
+// extras: los amigos que ya han llegado, cada uno con su sitio en la isla
+// ({ tipo, x, z, giro } en coordenadas del jardín). Van en el grupo «extras».
+export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768, extras = [] }) {
   const grupo = new THREE.Group();
+  const grupoExtras = new THREE.Group();
   const texturas = [];
 
   // Sombreado de dibujo animado, con los tonos fundidos entre sí
@@ -412,28 +503,52 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
     orejaConejo: orejaConejo(1, 1, 0.66, 0.127, 0),
     orejaRosa: orejaConejo(0.72, 0.88, 0.44, 0.13, 0.0112),
     pompon,
+    rizo: new THREE.IcosahedronGeometry(0.072, 2), // melena de Shisa
+    colaGrande: new THREE.SphereGeometry(0.1, 20, 14).scale(0.75, 1.7, 0.6).translate(0, 0.16, 0), // Momonga
+    colaPlana: new THREE.CapsuleGeometry(0.03, 0.09, 6, 12).scale(1.3, 1, 0.6).rotateX(1.2).translate(0, 0.05, -0.17), // Rakko
+    cojin: new THREE.CircleGeometry(0.46, 40).rotateX(-Math.PI / 2),
     toque: new THREE.SphereGeometry(0.3, 8, 6),
   };
   for (const g of Object.values(G)) g.computeBoundingSphere();
   const INVISIBLE = new THREE.MeshBasicMaterial({ visible: false });
 
-  // Mancha azul de Hachiware para el resto de la cabeza (da toda la vuelta)
-  const texGorro = (() => {
+  // Mancha de color para el resto de la cabeza (da toda la vuelta):
+  // la azul de Hachiware o el glaseado de Kurimanju
+  const texGorro = (d) => {
     const L = lienzoCabeza(-180, 180, -CAB.abajo, CAB.arriba, anchoCara >= 768 ? 1536 : 1024);
-    L.g.fillStyle = DATOS.hachiware.piel;
+    L.g.fillStyle = d.piel;
     L.g.fillRect(0, 0, L.c.width, L.c.height);
-    pintarGorro(L, -184, 184, DATOS.hachiware.azul);
-    return textura(L.c);
-  })();
-  texturas.push(texGorro);
+    pintarGorro(L, -184, 184, d.gorro.color, d.gorro.borde);
+    const tex = textura(L.c);
+    texturas.push(tex);
+    return tex;
+  };
+
+  // Tela de cuadros de la manta de pícnic y de las mantitas redondas
+  const texCuadros = (repite) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f7efff';
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle = 'rgba(160, 110, 220, 0.5)';
+    g.fillRect(0, 0, 32, 64);
+    g.fillRect(0, 0, 64, 32);
+    const tex = textura(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repite, repite);
+    texturas.push(tex);
+    return tex;
+  };
 
   /* ---------- Montaje ---------- */
   const lista = [];
   const toques = [];
 
-  function crear(tipo, x, z, giro) {
+  function crear(tipo, x, z, giro, padre = grupo) {
     const d = DATOS[tipo];
     const k = lista.length;
+    const talla = d.talla || 1;
     const mPiel = toon(d.piel);
     const raiz = new THREE.Group(); // sitio en la manta
     const salto = new THREE.Group(); // saltitos, respiración
@@ -444,7 +559,7 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
     torso.add(cab);
     raiz.position.set(x, 0, z);
     raiz.rotation.y = giro;
-    raiz.scale.setScalar(ESCALA);
+    raiz.scale.setScalar(ESCALA * talla);
     torso.position.y = d.patas + 0.012; // que asomen las patitas
     cab.position.y = Y_CUELLO;
     cab.rotation.order = 'YXZ';
@@ -469,7 +584,7 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
     texturas.push(caras.normal, caras.parpadeo, caras.feliz);
     const matCara = toonMapa(caras.normal);
     const yCab = Y_CABEZA - Y_CUELLO;
-    pieza(cabeza.resto, tipo === 'hachiware' ? toonMapa(texGorro) : mPiel, cab, false).position.y = yCab;
+    pieza(cabeza.resto, d.gorro ? toonMapa(texGorro(d)) : mPiel, cab, false).position.y = yCab;
     pieza(cabeza.cara, matCara, cab, false).position.y = yCab;
     const contorno = new THREE.Mesh(cabeza.todo, LINEA);
     contorno.position.y = yCab;
@@ -494,6 +609,57 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
       torso.add(cola);
       pieza(G.colaGato, azul, cola);
       pieza(G.puntaCola, azul, cola);
+    } else if (tipo === 'momonga') {
+      // orejitas azuladas y una cola grande y esponjosa que asoma por un lado
+      const azul = toon(d.azul);
+      for (const s of [-1, 1]) {
+        const o = pieza(G.orejaRedonda, azul, cab);
+        o.position.set(s * 0.143, yCab + 0.186, 0);
+        o.scale.setScalar(1.2);
+      }
+      cola = new THREE.Group();
+      cola.position.set(0, 0.06, -0.12);
+      cola.rotation.z = -1;
+      torso.add(cola);
+      pieza(G.colaGrande, azul, cola);
+    } else if (tipo === 'kurimanju') {
+      const marron = toon(d.gorro.color);
+      for (const s of [-1, 1]) {
+        const o = pieza(G.orejaRedonda, marron, cab);
+        o.position.set(s * 0.138, yCab + 0.188, 0);
+        o.scale.setScalar(0.85);
+      }
+      pieza(G.colita, mPiel, torso).position.set(0, 0.088, -0.15);
+    } else if (tipo === 'rakko') {
+      // orejas pequeñas a los lados y cola plana de nutria
+      for (const s of [-1, 1]) {
+        const o = pieza(G.orejaRedonda, mPiel, cab);
+        o.position.set(s * 0.205, yCab + 0.118, -0.01);
+        o.scale.setScalar(0.72);
+      }
+      pieza(G.colaPlana, mPiel, torso);
+    } else if (tipo === 'shisa') {
+      // melena de rizos alrededor de la cara, orejitas y cola con borla
+      const melena = toon(d.melena);
+      for (let i = 0; i < 9; i++) {
+        const a = (-140 + i * 35) * GRADO;
+        pieza(G.rizo, melena, cab).position.set(Math.sin(a) * 0.232, yCab + 0.028 + Math.cos(a) * 0.182, -0.05);
+      }
+      for (const s of [-1, 1]) {
+        const o = pieza(G.orejaGato, mPiel, cab);
+        o.position.set(s * 0.118, yCab + 0.168, 0.02);
+        o.scale.setScalar(0.7);
+        o.rotation.z = -s * 0.3;
+        o.userData.reposo = -s * 0.3;
+        orejas.push(o);
+      }
+      cola = new THREE.Group();
+      cola.position.set(0, 0.07, -0.14);
+      torso.add(cola);
+      pieza(G.colaGato, mPiel, cola);
+      const borla = pieza(G.rizo, melena, cola);
+      borla.position.set(0, 0.078, -0.074);
+      borla.scale.setScalar(0.42);
     } else {
       const rosa = toon('#f6b9c9');
       for (const s of [-1, 1]) {
@@ -518,9 +684,10 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
     raiz.add(toque);
     toques.push(toque);
 
-    grupo.add(raiz);
+    padre.add(raiz);
     lista.push({
-      tipo, nombre: d.nombre, frases: d.frases, cima: d.cima * ESCALA, raiz, salto, torso, cab, brazos, orejas, cola, sombra,
+      tipo, nombre: d.nombre, frases: d.frases, cima: d.cima * ESCALA * talla, raiz, salto, torso, cab, brazos, orejas, cola, sombra,
+      extra: padre !== grupo, giro, gato: tipo === 'hachiware' || tipo === 'shisa', // gato = mueve una oreja y la cola
       caras, matCara, gesto: 'normal', brazo: d.brazo, ritmo: d.ritmo, fase: k * 2.1,
       tSalto: -10, tParpadeo: 1.5 + k * 1.3, miraX: 0, miraY: 0, ladeo: 0, ladeoDestino: 0, tLadeo: 3 + k * 2,
       tOreja: 2 + k, tOreja0: -10, cualOreja: 0, tTiembla: 5,
@@ -530,20 +697,23 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
   crear('chiikawa', 0, 0.1, 0);
   crear('usagi', 0.78, -0.07, -0.2);
 
+  // Los amigos que han ido llegando: cada uno en su mantita redonda
+  if (extras.length) {
+    const tex = texCuadros(3.3);
+    for (const e of extras) {
+      if (!DATOS[e.tipo]) continue;
+      crear(e.tipo, e.x, e.z, e.giro, grupoExtras);
+      const color = DATOS[e.tipo].cojin;
+      const cojin = new THREE.Mesh(G.cojin, new THREE.MeshLambertMaterial({ map: tex, color, emissive: color, emissiveMap: tex, emissiveIntensity: 0.2 }));
+      cojin.position.set(e.x, 0.014, e.z);
+      cojin.rotation.y = e.giro;
+      grupoExtras.add(cojin);
+    }
+  }
+
   /* ---------- La manta de pícnic ---------- */
   {
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const g = c.getContext('2d');
-    g.fillStyle = '#f7efff';
-    g.fillRect(0, 0, 64, 64);
-    g.fillStyle = 'rgba(160, 110, 220, 0.5)';
-    g.fillRect(0, 0, 32, 64);
-    g.fillRect(0, 0, 64, 32);
-    const tex = textura(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(3.6, 3.6);
-    texturas.push(tex);
+    const tex = texCuadros(3.6);
     const w = MANTA.ancho / 2, h = MANTA.fondo / 2, r = 0.14;
     const f = new THREE.Shape();
     f.moveTo(-w + r, -h);
@@ -627,7 +797,9 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
           o.rotation.x = -0.1 + Math.sin(t * 1.4 + f + i) * 0.045 - (saltando ? Math.cos(s * Math.PI * 2) * 0.22 : 0);
           o.rotation.z = -lado * 0.07 + Math.sin(t * 1.1 + f + i * 1.3) * 0.03;
         }
-      } else if (p.tipo === 'hachiware') {
+      } else if (p.tipo === 'momonga') {
+        p.cola.rotation.z = -1 + Math.sin(t * 1.5 + f) * 0.1;
+      } else if (p.gato) {
         if (t > p.tOreja) {
           p.cualOreja = Math.random() < 0.5 ? 0 : 1;
           p.tOreja0 = t;
@@ -663,5 +835,5 @@ export function crearPersonajes({ geoSombra, matSombra, anchoCara = 768 }) {
     return true;
   }
 
-  return { grupo, lista, toques, texturas, actualizar, saltar };
+  return { grupo, extras: grupoExtras, lista, toques, texturas, actualizar, saltar };
 }

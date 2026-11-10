@@ -1,7 +1,7 @@
 import * as THREE from './lib/three.module.min.js';
 import { OrbitControls } from './lib/OrbitControls.js';
 import { crearMusica } from './musica.js';
-import { crearPersonajes, MANTA } from './personajes.js';
+import { crearPersonajes, MANTA, AMIGOS_NUEVOS } from './personajes.js';
 
 /* ═════════════════════ Utilidades ═════════════════════ */
 
@@ -62,8 +62,16 @@ const diasEntre = (a, b) => Math.round((b - a) / DIA_MS);
 const masDias = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const fmtFecha = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'long' });
 
+// La flor de cada día brota a esta hora (config.js → horaFlor), hora de quien mira.
+// Hasta entonces, en el jardín sigue siendo el día anterior.
+const HORA_FLOR = Math.min(23, Math.max(0, Math.floor(Number(CONFIG.horaFlor ?? 17)) || 0));
+function diaJardin(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() - HORA_FLOR);
+  return new Date(x.getFullYear(), x.getMonth(), x.getDate());
+}
 const ahora = new Date();
-const HOY_REAL = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+const HOY_REAL = diaJardin(ahora);
+const HOY_CALENDARIO = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
 const INICIO = leerFecha(CONFIG.inicio) || HOY_REAL;
 const REENCUENTRO = leerFecha(CONFIG.reencuentro);
 
@@ -75,6 +83,15 @@ const HOY = MODO_VISTA ? masDias(INICIO, diaVista - 1) : HOY_REAL;
 const DIA_N = diasEntre(INICIO, HOY) + 1; // día 1 = el día que empezasteis
 const ABIERTAS = Math.max(0, DIA_N); // una flor por día juntos
 const IDX_HOY = DIA_N >= 1 ? DIA_N - 1 : -1;
+
+// Meses enteros juntos. Cada mes llega al jardín un amigo nuevo de Chiikawa
+// (config.js → amigos dice en qué mes llega cada uno).
+const MESES = Math.max(0, (HOY.getFullYear() - INICIO.getFullYear()) * 12 + HOY.getMonth() - INICIO.getMonth()
+  - (HOY.getDate() < INICIO.getDate() ? 1 : 0));
+const MES_AMIGO = CONFIG.amigos ?? { momonga: 2, kurimanju: 3, rakko: 4, shisa: 5 };
+const LLEGADOS = AMIGOS_NUEVOS
+  .map((tipo, hueco) => ({ tipo, hueco, mes: Number(MES_AMIGO[tipo]) }))
+  .filter((q) => q.mes >= 1 && q.mes <= MESES);
 
 // Mensajes escondidos en flores de días concretos
 const MENSAJES = new Map();
@@ -195,9 +212,11 @@ const TEX_SOMBRA = texturaRadial([[0, 'rgba(0,0,0,.55)'], [0.6, 'rgba(0,0,0,.2)'
 /* ═════════════════════ La isla ═════════════════════ */
 
 const ESPACIO = 0.62; // separación entre flores (espiral)
-// La isla crece a medida que brotan flores (+1 por el brote de mañana).
-const RADIO = Math.max(3.4, ESPACIO * Math.sqrt(ABIERTAS + 2) + 1.55);
-const borde = (a) => 1 + 0.045 * Math.sin(a * 5 + 1.3) + 0.025 * Math.sin(a * 11 + 0.4) + 0.015 * Math.sin(a * 17);
+// La isla crece a medida que brotan flores (+1 por el brote de mañana)
+// y da un estirón cada vez que llega un amigo nuevo.
+const ESTIRON = 0.3;
+const RADIO = Math.max(3.4, ESPACIO * Math.sqrt(ABIERTAS + 2) + 1.55) + ESTIRON * LLEGADOS.length;
+const bordeBase = (a) => 1 + 0.045 * Math.sin(a * 5 + 1.3) + 0.025 * Math.sin(a * 11 + 0.4) + 0.015 * Math.sin(a * 17);
 const ANG_CARTEL = Math.PI / 2 + 0.62;
 const difAngulo = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -210,7 +229,7 @@ const SITIO = (() => {
     const cabe = () => {
       for (let k = -4; k <= 4; k++) {
         const x = (k / 4) * (MANTA.ancho / 2), z = r + MANTA.fondo / 2;
-        if (Math.hypot(x, z) > RADIO * borde(a - Math.atan2(x, z)) - 0.22) return false;
+        if (Math.hypot(x, z) > RADIO * bordeBase(a - Math.atan2(x, z)) - 0.22) return false;
       }
       return true;
     };
@@ -220,10 +239,31 @@ const SITIO = (() => {
   const ca = Math.cos(mejor.a), sa = Math.sin(mejor.a);
   return { ...mejor, ca, sa, x: ca * mejor.r, z: sa * mejor.r, medioAngulo: Math.atan2(MANTA.ancho / 2 + 0.35, mejor.r) };
 })();
+
+// Cada amigo que llega tiene su sitio a un lado u otro de la manta, y la isla
+// saca ahí un saliente nuevo para él. El sitio de cada uno no cambia nunca.
+const HUECOS = [-0.85, 1.45, -1.6, 2.2]; // ángulo respecto a la manta
+const COJIN = 0.46; // radio de su mantita redonda
+const VECINOS = LLEGADOS.map((q) => ({ ...q, a: SITIO.a + HUECOS[q.hueco] }));
+const borde = (a) => {
+  let b = bordeBase(a);
+  for (const v of VECINOS) b += 0.075 * Math.exp(-((difAngulo(a, v.a) / 0.3) ** 2));
+  return b;
+};
+for (const v of VECINOS) {
+  v.r = RADIO * borde(v.a) - 0.72;
+  v.x = Math.cos(v.a) * v.r;
+  v.z = Math.sin(v.a) * v.r;
+  v.frente = v.a + difAngulo(SITIO.a, v.a) * 0.55; // mira hacia fuera, girado hacia donde se entra al jardín
+  v.medioAngulo = Math.atan2(COJIN + 0.34, v.r);
+}
+const juntoAVecino = (a) => VECINOS.some((v) => Math.abs(difAngulo(a, v.a)) < v.medioAngulo);
+
 function enManta(x, z, margen = 0.07) {
   const dx = x - SITIO.x, dz = z - SITIO.z;
-  return Math.abs(dx * SITIO.sa - dz * SITIO.ca) < MANTA.ancho / 2 + margen
-    && Math.abs(dx * SITIO.ca + dz * SITIO.sa) < MANTA.fondo / 2 + margen;
+  if (Math.abs(dx * SITIO.sa - dz * SITIO.ca) < MANTA.ancho / 2 + margen
+    && Math.abs(dx * SITIO.ca + dz * SITIO.sa) < MANTA.fondo / 2 + margen) return true;
+  return VECINOS.some((v) => Math.hypot(x - v.x, z - v.z) < COJIN + margen);
 }
 
 /* ---------- Cielo de atardecer ---------- */
@@ -405,7 +445,7 @@ const rocasFlotantes = [];
     const a = (i / n) * Math.PI * 2 + (r() - 0.5) * 0.5;
     const dif = Math.atan2(Math.sin(a - ANG_CARTEL), Math.cos(a - ANG_CARTEL));
     if (Math.abs(dif) < 0.45 * (3.6 / Math.max(3.6, RADIO))) continue;
-    if (Math.abs(difAngulo(a, SITIO.a)) < SITIO.medioAngulo) continue; // que no tapen a Chiikawa y sus amigos
+    if (Math.abs(difAngulo(a, SITIO.a)) < SITIO.medioAngulo || juntoAVecino(a)) continue; // que no tapen a Chiikawa y sus amigos
     const rr = RADIO * borde(a) - 0.32;
     const m = new THREE.Mesh(geoArbusto, matArbusto);
     const s = 0.7 + r() * 0.7;
@@ -1096,14 +1136,20 @@ const fugaz = (() => {
    Están de pícnic en una manta al borde del jardín (ver personajes.js).
    Si los tocas, dan dos saltitos, dicen algo y la cámara se acerca. */
 
-const amigos = crearPersonajes({ geoSombra: GEO.sombra, matSombra: MAT.sombra, anchoCara: Q.caras });
+const amigos = crearPersonajes({
+  geoSombra: GEO.sombra, matSombra: MAT.sombra, anchoCara: Q.caras,
+  extras: VECINOS.map((v) => ({ tipo: v.tipo, x: v.x, z: v.z, giro: Math.PI / 2 - v.frente })),
+});
 amigos.grupo.position.set(SITIO.x, 0, SITIO.z);
 amigos.grupo.rotation.y = Math.PI / 2 - SITIO.a; // mirando hacia fuera de la isla
-escena.add(amigos.grupo);
+escena.add(amigos.grupo, amigos.extras);
 amigos.grupo.updateMatrixWorld(true);
+amigos.extras.updateMatrixWorld(true);
 for (const tex of amigos.texturas) renderer.initTexture(tex); // así no hay tirón la primera vez que cambian de cara
 const toquesPersonajes = amigos.toques;
 const FRENTE_AMIGOS = new V3(SITIO.ca, 0, SITIO.sa);
+// Hacia dónde mira cada uno: desde ahí se le acerca la cámara
+for (const p of amigos.lista) p.frente = p.extra ? new V3(Math.sin(p.giro), 0, Math.cos(p.giro)) : FRENTE_AMIGOS;
 
 const burbuja = { el: $('burbuja'), de: -1, fin: 0, medio: 60, pos: new V3() };
 function decir(k) {
@@ -1142,9 +1188,13 @@ function tocarPersonaje(k) {
   if (amigos.saltar(k, t)) {
     chispas.lanzar(p.raiz.getWorldPosition(new V3()).add(new V3(0, p.cima * 0.75, 0)), 26, 0.8);
     vibrar(12);
-    decir(k);
-    const dura = musica.voz(p.tipo, p.frases[p.frase]); // dice con su voz lo que pone en el bocadillo
-    burbuja.fin = Math.max(burbuja.fin, t + dura + 0.4); // el bocadillo no se va antes de que acabe de hablar
+    if (p.frases.length) { // los amigos sin grabación de voz no dicen nada
+      decir(k);
+      const dura = musica.voz(p.tipo, p.frases[p.frase]); // dice con su voz lo que pone en el bocadillo
+      burbuja.fin = Math.max(burbuja.fin, t + dura + 0.4); // el bocadillo no se va antes de que acabe de hablar
+    } else {
+      musica.efecto('salto');
+    }
   }
   if (tarjetaAbierta !== null) cerrarTarjeta(false);
   if (enfoque !== k) {
@@ -1158,7 +1208,7 @@ function tocarPersonaje(k) {
 
 const vertical = () => camara.aspect < 1;
 function ajustarCamara() {
-  const w = window.innerWidth, h = window.innerHeight;
+  const w = window.innerWidth || 1, h = window.innerHeight || 1; // nunca 0: la cámara se rompería
   camara.aspect = w / h;
   camara.fov = vertical() ? 55 : 42;
   camara.updateProjectionMatrix();
@@ -1215,7 +1265,7 @@ function volarAPersonaje(p) {
   const c = p.raiz.getWorldPosition(new V3());
   const dist = vertical() ? 3.3 : 2.7;
   const objetivo = c.clone().add(new V3(0, p.cima * 0.6, 0));
-  const pos = objetivo.clone().addScaledVector(FRENTE_AMIGOS, dist * 0.96).add(new V3(0, dist * 0.2, 0));
+  const pos = objetivo.clone().addScaledVector(p.frente, dist * 0.96).add(new V3(0, dist * 0.2, 0));
   volar(objetivo, pos, 1.5);
 }
 function volverAGeneral(dur = 1.8, bajar = 0) {
@@ -1257,6 +1307,24 @@ const ui = {
 };
 let tarjetaAbierta = null; // índice de flor o 'carta'
 
+// Cuenta atrás hasta la próxima flor: brota cada día a las HORA_FLOR (hora de quien mira)
+function cuentaAtrasFlor() {
+  const c = $('hudProxima');
+  if (DIA_N < 0) return; // el jardín aún no ha empezado
+  const a = new Date();
+  const brotada = diaJardin(a).getTime() !== HOY_REAL.getTime(); // ya ha dado la hora y sigue con el jardín abierto
+  const proxima = new Date(a.getFullYear(), a.getMonth(), a.getDate() + (a.getHours() >= HORA_FLOR ? 1 : 0), HORA_FLOR);
+  const s = Math.max(0, Math.ceil((proxima - a) / 1000));
+  const dos = (n) => String(n).padStart(2, '0');
+  const falta = `${dos(Math.floor(s / 3600))}:${dos(Math.floor(s / 60) % 60)}:${dos(s % 60)}`;
+  c.hidden = false;
+  c.classList.toggle('brotada', brotada);
+  if (brotada) c.textContent = '🌸 ¡Ha brotado una flor nueva! Toca aquí';
+  else c.innerHTML = `🌱 Nueva flor en <strong>${falta}</strong>`;
+  const intro = $('introFalta');
+  if (intro) intro.textContent = brotada ? '00:00:00' : falta;
+}
+
 function pintarInterfaz() {
   const para = String(CONFIG.para || '').trim();
   $('introPara').textContent = para ? `Para ${para} 💜` : 'Para ti 💜';
@@ -1273,9 +1341,23 @@ function pintarInterfaz() {
   } else if (NUEVAS.length === 1) {
     texto = `Hoy ha brotado una flor nueva: ya llevamos ${DIA_N} ${plural(DIA_N, 'día', 'días')} juntos 💜`;
   } else {
-    texto = 'Ya viste la flor de hoy. Mañana brota otra 🌱';
+    texto = 'Ya has visto todas las flores 🌱';
+  }
+  // El día que se cumple el mes, avisa de quién acaba de llegar
+  const recien = HOY.getDate() === INICIO.getDate() ? VECINOS.find((v) => v.mes === MESES) : null;
+  if (recien && DIA_N >= 1) {
+    const nombre = amigos.lista.find((p) => p.tipo === recien.tipo)?.nombre;
+    if (nombre) texto += ` ¡Y hoy ha llegado ${nombre} al jardín!`;
   }
   $('introTexto').textContent = texto;
+  if (DIA_N >= 1 && !PRIMERA && !NUEVAS.length) { // ya vio la de hoy: cuánto falta para la siguiente
+    const falta = document.createElement('strong');
+    falta.id = 'introFalta';
+    $('introTexto').append(' Faltan ', falta, ' para la siguiente.');
+  }
+  cuentaAtrasFlor();
+  setInterval(cuentaAtrasFlor, 1000);
+  $('hudProxima').addEventListener('click', () => location.reload());
 
   // Contador de la esquina
   const dias = Math.max(0, DIA_N);
@@ -1285,7 +1367,7 @@ function pintarInterfaz() {
   $('hudFloresTxt').textContent = plural(ABIERTAS, 'flor', 'flores');
 
   if (REENCUENTRO) {
-    const f = diasEntre(HOY, REENCUENTRO);
+    const f = diasEntre(MODO_VISTA ? HOY : HOY_CALENDARIO, REENCUENTRO);
     const c = $('hudCuenta');
     if (f >= 0) {
       c.textContent = f === 0 ? '¡Hoy nos vemos! 💜' : f === 1 ? '¡Mañana nos vemos! 💜' : `Faltan ${f} días para vernos ✈️`;
@@ -1332,7 +1414,8 @@ function abrirTarjeta(i) {
   ui.etiqueta.textContent = `Flor nº ${i + 1} · ${fmtFecha.format(fecha)}${i === IDX_HOY ? ' · hoy' : ''}`;
   if (flor.estado === 'brote') {
     const dif = diasEntre(HOY, fecha);
-    ui.texto.textContent = dif <= 1 ? 'Esta flor brota mañana. Vuelve a verla 🌱' : `Esta flor brota dentro de ${dif} días 🌱`;
+    const cuando = new Date().getHours() < HORA_FLOR ? 'hoy' : 'mañana';
+    ui.texto.textContent = dif <= 1 ? `Esta flor brota ${cuando} a las ${HORA_FLOR}:00. Vuelve a verla 🌱` : `Esta flor brota dentro de ${dif} días 🌱`;
     ui.foto.hidden = true;
     ui.nav.hidden = true;
   } else {
